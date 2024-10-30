@@ -81,7 +81,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Enter path to folder with gds files and layer number to create an image')
   parser.add_argument('input_folder_path', type = str, help = 'Path for input folder with gdsii files')
   parser.add_argument('output_folder_path', type = str, help = 'Path for output folder with images')
-  parser.add_argument('layer_number', type = int, help = 'Number of layer in topology file; 3 - refers to original, 100 - refers to correction  ' )
+  parser.add_argument('layer_number', type = int, help = 'Number of layer in topology file; 3 - refers to original, 100 - refers to train_correction')
 
   args = parser.parse_args()
   layers = args.layer_number
@@ -95,11 +95,11 @@ if __name__ == '__main__':
     os.mkdir(output_folder_path)
 
   if layer_number == 3:
-      subfolder_path = os.path.join(output_folder_path, 'origin')
+      subfolder_path = os.path.join(output_folder_path, 'train_origin')
       if not os.path.exists(subfolder_path):
           os.mkdir(subfolder_path)
   elif layer_number == 100:
-      subfolder_path = os.path.join(output_folder_path, 'correction')
+      subfolder_path = os.path.join(output_folder_path, 'train_correction')
       if not os.path.exists(subfolder_path):
           os.mkdir(subfolder_path)
 
