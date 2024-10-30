@@ -148,27 +148,5 @@ if __name__ == '__main__':
       plt.savefig(centered_name, bbox_inches='tight', pad_inches=0, dpi=102.4)
       plt.close()
 
-      '''
-      if we want to have our images in grayscale format then we need to further process the image
-      using the PIL library.  For this purpose we create a blank image with PIL(black background)
-      and 
-      '''
-
-      # image = Image.open(centered_name)
-
-      # right = 27
-      # left = 27
-      # top = 27
-      # bottom = 27
-      #
-      # width, height = image.size
-      # new_width = width + right + left
-      # new_height = height + top + bottom
-      # blank_rgb = Image.new(image.mode, (new_width, new_height), (0, 0, 0))
-      # result = ImageOps.grayscale(blank_rgb)
-      # result.paste(image, (27, 27))  # left, top, placing in (27;27) to get 1024x1024 padded images
-      # final_image_name = subfolder_path + '/'  + file_name + '_padded.jpg'
-      # result.save(final_image_name)
-      # os.remove(centered_name)
 
 
