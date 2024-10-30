@@ -3,7 +3,6 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 import torch.optim.lr_scheduler as lr_sched
-from PIL import Image
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
@@ -11,20 +10,18 @@ import logging
 import os
 
 from models.model import Generator
-from data.dataset import OPCDataset
+from data.dataset import OPCDataset, BinarizeTransform
 
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
   # # Convert from [-1, 1] to [0, 255] for saving
   # output = 0.5 * (output + 1)  # Brings values to [0, 1] range
 
-  single_image = torch.mean(output[0], axis=0)
+  single_image = output[0].squeeze(dim = 0)
   single_image[single_image > 0.5] = 1.0
   single_image[single_image <= 0.5] = 0.0
 
   img_save_path = os.path.join(checkpoint_dir, f"{image_type}_epoch{epoch}_step{step}.png")
   cv2.imwrite(f"{img_save_path}", (single_image * 255).detach().cpu().numpy())
-  saved_img = Image.open(img_save_path)
-  # saved_img.show()
   print(f"Saved generated image at {img_save_path}")
   logging.info(f"Saved generated image at {img_save_path}")
 
@@ -175,8 +172,8 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
     logging.info(f'[Losses per {epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(train_loader):.4f}, IoU loss={iou_loss_epoch/len(train_loader):.4f}, Total loss={total_loss_epoch/len(train_loader):.4f}')
     total_loss_epoch_list_train.append(total_loss_epoch / len(train_loader))
 	
-    total_loss_epoch_loss_val = validate_model(model, val_loader, current_epoch = epoch, num_epochs=num_epochs, checkpoint_dir = checkpoint_dir, device = device)
-    total_loss_epoch_list_val.append(total_loss_epoch_loss_val)
+    total_loss_epoch_val = validate_model(model, val_loader, current_epoch = epoch, num_epochs=num_epochs, checkpoint_dir = checkpoint_dir, device = device)
+    total_loss_epoch_list_val.append(total_loss_epoch_val)
 
     plt.figure(figsize=(8, 6))
     plt.plot(total_loss_epoch_list_train, marker='o', linestyle='-', label='train_loss')
@@ -202,7 +199,7 @@ logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 logging.info(f'Training device:{DEVICE}')
 
-generator_model = Generator(in_ch = 3, out_ch = 3)
+generator_model = Generator(in_ch = 1, out_ch = 1)
 print('Model initialized:', generator_model)
 logging.info('Model initialized')
 
@@ -214,22 +211,24 @@ print(f'Output shape: {torch.sigmoid(output).shape}')
 test_image = torch.randn((1,3,1024,1024))
 # summary(generator, (3,1024,1024))
 
-transform = transforms.Compose([
+TRANSFORM = transforms.Compose([
     transforms.Resize((1024, 1024)),
     transforms.ToTensor(),
+    transforms.Grayscale(),
+    BinarizeTransform(threshold=0.5)
 ])
 
-BATCH_SIZE = 1
+BATCH_SIZE = 3
 logging.info(f'Batch size:{BATCH_SIZE}')
-# Dataset paths
-TRAIN_DATASET = OPCDataset("data/processed/gds_dataset_new/origin/train_origin", "data/processed/gds_dataset_new/correction/train_correction", transform = transform)
-VALID_DATASET = OPCDataset("data/processed/gds_dataset_new/origin/valid_origin", "data/processed/gds_dataset_new/correction/valid_correction", transform = transform)
-TEST_DATASET = OPCDataset("data/processed/gds_dataset_new/origin/test_origin", "data/processed/gds_dataset_new/correction/test_correction", transform = transform)
+# Define dataset
+TRAIN_DATASET = OPCDataset("data/processed/gds_dataset/origin/train_origin", "data/processed/gds_dataset/correction/train_correction", transform = TRANSFORM)
+VALID_DATASET = OPCDataset("data/processed/gds_dataset/origin/valid_origin", "data/processed/gds_dataset/correction/valid_correction", transform = TRANSFORM)
+TEST_DATASET = OPCDataset("data/processed/gds_dataset/origin/test_origin", "data/processed/gds_dataset/correction/test_correction", transform = TRANSFORM)
 
-# DataLoader
+# Define dataloader
 TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True)
 VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False)
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = True)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False)
 
 print(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
 print(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
@@ -247,6 +246,8 @@ mse_loss_value = torch.nn.functional.mse_loss(output.sigmoid(), target)
 
 print(f'IoU loss:{iou_loss_value}')
 print(f'L1-loss:{mse_loss_value}')
+print(f'IoU loss shape:{iou_loss_value.shape}')
+print(f'L1-loss shape:{mse_loss_value.shape}')
 
 plt.imshow(target[0,0], cmap='gray')
 plt.show()
@@ -254,7 +255,7 @@ plt.show()
 pretrain_model(model = generator_model,
                train_loader = TRAIN_LOADER,
                val_loader = VALID_LOADER,
-               num_epochs = 14,
+               num_epochs = 15,
                lr = 2e-4,
                device = DEVICE,
                start_epoch = 0,
