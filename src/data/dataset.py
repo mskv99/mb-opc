@@ -1,6 +1,8 @@
 from PIL import Image
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
+import numpy as np
+import torch
 import os
 
 class OPCDataset(Dataset):
@@ -42,11 +44,20 @@ class TestDataset(Dataset):
         if self.transform:
             image = self.transform(image)
 
-        return image
+        return image, img_path
 
-# Define transformations (resize to 1024x1024)
-transform = transforms.Compose([
-    transforms.Resize((1024, 1024)),
-    transforms.ToTensor(),
-])
+class BinarizeTransform:
+    def __init__(self, threshold=0.5):
+        self.threshold = threshold
+
+    def __call__(self, tensor):
+        # Assuming the input tensor is of shape (1, 1, 1024, 1024)
+        # Convert the tensor to a NumPy array
+        image_array = tensor.squeeze().numpy()  # Shape will be (1024, 1024)
+
+        # Binarize the image
+        binarized_image = (image_array > self.threshold).astype(np.float32)  # Binary (0 or 1)
+
+        # Convert back to tensor and maintain shape (1, 1, 1024, 1024)
+        return torch.from_numpy(binarized_image).unsqueeze(0)  # Shape will be (1, 1, 1024, 1024)
 
