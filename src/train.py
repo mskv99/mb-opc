@@ -1,5 +1,6 @@
 import cv2
 import torch
+import random
 import torch.optim as optim
 from tqdm import tqdm
 import torch.optim.lr_scheduler as lr_sched
@@ -11,6 +12,16 @@ import os
 
 from models.model import Generator
 from data.dataset import OPCDataset, BinarizeTransform
+
+def set_random_seed(seed):
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+  np.random.seed(seed)
+  random.seed(seed)
+
+set_random_seed(42)
 
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
   # # Convert from [-1, 1] to [0, 255] for saving
@@ -151,6 +162,15 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
       if idx % 200 == 0:
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
+
+      plt.figure(figsize=(8,6))
+      plt.plot(total_loss_iter_list, marker='o', linestyle='-', label='train_iter_loss')
+      plt.title('Iteration loss')
+      plt.xlabel('iteration')
+      plt.ylabel('loss')
+      plt.legend()
+      plt.savefig(os.path.join(checkpoint_dir, 'iter_loss_train.jpg'))
+      plt.close()
 
       l2_loss_epoch += l2_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
