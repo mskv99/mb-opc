@@ -30,3 +30,6 @@ dist/
 *.gds
 *.pth
 *.txt
+
+# Не хотим игнорирова requirements.txt
+!requirements.txt

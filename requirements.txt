@@ -1,0 +1,9 @@
+gdsast==1.0.2
+gdspy==1.6.13
+matplotlib==3.9.2
+numpy==2.1.2
+opencv_python==4.10.0.84
+Pillow==11.0.0
+torch==2.0.0
+torchvision==0.15.1
+tqdm==4.66.5
