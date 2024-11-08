@@ -154,23 +154,23 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
       total_loss_iter.backward()
       optimizer.step()
 
-      if idx % 20 == 0:
+      if idx % 50 == 0:
         print(
           f"Epoch [{epoch}/{num_epochs}], Step [{idx}/{len(train_loader)}], L2 Loss: {l2_loss_iter.item():.4f}, IoU Loss: {iou_loss_iter.item():.4f}, Total Loss: {total_loss_iter.item():.4f}")
         logging.info(f"Epoch [{epoch}/{num_epochs}], Step [{idx}/{len(train_loader)}], L2 Loss: {l2_loss_iter.item():.4f}, IoU Loss: {iou_loss_iter.item():.4f}, Total Loss: {total_loss_iter.item():.4f}")
 
+        plt.figure(figsize=(8, 6))
+        plt.plot(total_loss_iter_list, linestyle='-', label='train_iter_loss')
+        plt.title('Iteration loss')
+        plt.xlabel('iteration')
+        plt.ylabel('loss')
+        plt.legend()
+        plt.savefig(os.path.join(checkpoint_dir, 'iter_loss_train.jpg'))
+        plt.close()
+
       if idx % 200 == 0:
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
-
-      plt.figure(figsize=(8,6))
-      plt.plot(total_loss_iter_list, marker='o', linestyle='-', label='train_iter_loss')
-      plt.title('Iteration loss')
-      plt.xlabel('iteration')
-      plt.ylabel('loss')
-      plt.legend()
-      plt.savefig(os.path.join(checkpoint_dir, 'iter_loss_train.jpg'))
-      plt.close()
 
       l2_loss_epoch += l2_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
@@ -196,8 +196,8 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
     total_loss_epoch_list_val.append(total_loss_epoch_val)
 
     plt.figure(figsize=(8, 6))
-    plt.plot(total_loss_epoch_list_train, marker='o', linestyle='-', label='train_loss')
-    plt.plot(total_loss_epoch_list_val, marker='o', linestyle='-', color='b', label='valid_loss')
+    plt.plot(total_loss_epoch_list_train, linestyle='-', label='train_loss')
+    plt.plot(total_loss_epoch_list_val, linestyle='-', color='b', label='valid_loss')
     plt.title('Epoch loss')
     plt.xlabel('epoch')
     plt.ylabel('loss')
