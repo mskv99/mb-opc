@@ -1,6 +1,7 @@
 import cv2
 import torch
 import random
+import numpy as np
 import torch.optim as optim
 from tqdm import tqdm
 import torch.optim.lr_scheduler as lr_sched
@@ -24,9 +25,6 @@ def set_random_seed(seed):
 set_random_seed(42)
 
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
-  # # Convert from [-1, 1] to [0, 255] for saving
-  # output = 0.5 * (output + 1)  # Brings values to [0, 1] range
-
   single_image = output[0].squeeze(dim = 0)
   single_image[single_image > 0.5] = 1.0
   single_image[single_image <= 0.5] = 0.0
@@ -117,7 +115,7 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
 
   # Load checkpoint if resuming
   if resume:
-    checkpoint = torch.load('/home/amoskovtsev/MBOPC/custom_unet/checkpoints/checkpoint_14.10.24.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
+    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/checkpoint_14.10.24.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     start_epoch = checkpoint['epoch'] + 1
@@ -169,15 +167,22 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
         plt.close()
 
       if idx % 200 == 0:
-        # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(total_loss_iter_list, linestyle='-', label='train_iter_loss')
+        plt.title('Iteration loss')
+        plt.xlabel('iteration')
+        plt.ylabel('loss')
+        plt.legend()
+        plt.savefig(os.path.join(checkpoint_dir, 'iter_loss_train.jpg'))
+        plt.close()
 
       l2_loss_epoch += l2_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
 
       if idx % 500 == 0:
-        # checkpoint_path = os.path.join(, "last_checkpoint.pth")
         checkpoint_path = os.path.join(checkpoint_dir, 'last_checkpoint.pth')
         torch.save({
           'epoch': epoch,
@@ -191,7 +196,6 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
       f'[Losses per {epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(train_loader):.4f}, IoU loss={iou_loss_epoch/len(train_loader):.4f}, Total loss={total_loss_epoch/len(train_loader):.4f}')
     logging.info(f'[Losses per {epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(train_loader):.4f}, IoU loss={iou_loss_epoch/len(train_loader):.4f}, Total loss={total_loss_epoch/len(train_loader):.4f}')
     total_loss_epoch_list_train.append(total_loss_epoch / len(train_loader))
-	
     total_loss_epoch_val = validate_model(model, val_loader, current_epoch = epoch, num_epochs=num_epochs, checkpoint_dir = checkpoint_dir, device = device)
     total_loss_epoch_list_val.append(total_loss_epoch_val)
 
@@ -211,7 +215,7 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
   print('Traning complete')
   logging.info('Traning complete')
 
-CHECKPOINT_DIR = get_next_experiment_folder('checkpoints')
+CHECKPOINT_DIR = get_next_experiment_folder('/mnt/data/amoskovtsev/mb_opc/checkpoints')
 print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 setup_logging(CHECKPOINT_DIR)
 logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
@@ -223,12 +227,12 @@ generator_model = Generator(in_ch = 1, out_ch = 1)
 print('Model initialized:', generator_model)
 logging.info('Model initialized')
 
-test_image = torch.randn((1,3,1024,1024))
+test_image = torch.randn((1,1,1024,1024))
 output = generator_model.forward(test_image)
 print(f'Output shape: {output.shape}')
 print(f'Output shape: {torch.sigmoid(output).shape}')
 
-test_image = torch.randn((1,3,1024,1024))
+test_image = torch.randn((1,1,1024,1024))
 # summary(generator, (3,1024,1024))
 
 TRANSFORM = transforms.Compose([
@@ -241,14 +245,14 @@ TRANSFORM = transforms.Compose([
 BATCH_SIZE = 3
 logging.info(f'Batch size:{BATCH_SIZE}')
 # Define dataset
-TRAIN_DATASET = OPCDataset("data/processed/gds_dataset/origin/train_origin", "data/processed/gds_dataset/correction/train_correction", transform = TRANSFORM)
-VALID_DATASET = OPCDataset("data/processed/gds_dataset/origin/valid_origin", "data/processed/gds_dataset/correction/valid_correction", transform = TRANSFORM)
-TEST_DATASET = OPCDataset("data/processed/gds_dataset/origin/test_origin", "data/processed/gds_dataset/correction/test_correction", transform = TRANSFORM)
+TRAIN_DATASET = OPCDataset("/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/origin/train_origin", "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/correction/train_correction", transform = TRANSFORM)
+VALID_DATASET = OPCDataset("/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/origin/valid_origin", "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/correction/valid_correction", transform = TRANSFORM)
+TEST_DATASET = OPCDataset("/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/origin/test_origin", "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/correction/test_correction", transform = TRANSFORM)
 
 # Define dataloader
-TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True)
-VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False)
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False)
+TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
+VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
 
 print(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
 print(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
@@ -269,8 +273,9 @@ print(f'L1-loss:{mse_loss_value}')
 print(f'IoU loss shape:{iou_loss_value.shape}')
 print(f'L1-loss shape:{mse_loss_value.shape}')
 
-plt.imshow(target[0,0], cmap='gray')
-plt.show()
+# plt.imshow(target[0,0], cmap='gray')
+# plt.show()
+
 # Train the model
 pretrain_model(model = generator_model,
                train_loader = TRAIN_LOADER,
