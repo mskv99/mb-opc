@@ -13,6 +13,7 @@ import os
 
 from models.model import Generator
 from data.dataset import OPCDataset, BinarizeTransform
+from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
 def set_random_seed(seed):
   torch.manual_seed(seed)
@@ -215,12 +216,11 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
   print('Traning complete')
   logging.info('Traning complete')
 
-CHECKPOINT_DIR = get_next_experiment_folder('/mnt/data/amoskovtsev/mb_opc/checkpoints')
+CHECKPOINT_DIR = get_next_experiment_folder(CHECKPOINT_PATH)
+DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 setup_logging(CHECKPOINT_DIR)
 logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
-
-DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 logging.info(f'Training device:{DEVICE}')
 
 generator_model = Generator(in_ch = 1, out_ch = 1)
@@ -232,9 +232,6 @@ output = generator_model.forward(test_image)
 print(f'Output shape: {output.shape}')
 print(f'Output shape: {torch.sigmoid(output).shape}')
 
-test_image = torch.randn((1,1,1024,1024))
-# summary(generator, (3,1024,1024))
-
 TRANSFORM = transforms.Compose([
     transforms.Resize((1024, 1024)),
     transforms.ToTensor(),
@@ -242,12 +239,11 @@ TRANSFORM = transforms.Compose([
     BinarizeTransform(threshold=0.5)
 ])
 
-BATCH_SIZE = 3
 logging.info(f'Batch size:{BATCH_SIZE}')
 # Define dataset
-TRAIN_DATASET = OPCDataset("/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/origin/train_origin", "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/correction/train_correction", transform = TRANSFORM)
-VALID_DATASET = OPCDataset("/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/origin/valid_origin", "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/correction/valid_correction", transform = TRANSFORM)
-TEST_DATASET = OPCDataset("/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/origin/test_origin", "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset/correction/test_correction", transform = TRANSFORM)
+TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = TRANSFORM)
+VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = TRANSFORM)
+TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = TRANSFORM)
 
 # Define dataloader
 TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
@@ -257,6 +253,11 @@ TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False,
 print(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
 print(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
 print(f'Number of images in test subset:{len(TEST_DATASET)}\n')
+
+logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
+logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
+logging.ingo(f'Number of images in test subset:{len(TEST_DATASET)}\n')
+
 image, target = next(iter(TRAIN_LOADER))
 print(f'Image shape: {image.shape}')
 print(f'Target shape: {target.shape}')
@@ -276,12 +277,12 @@ print(f'L1-loss shape:{mse_loss_value.shape}')
 # plt.imshow(target[0,0], cmap='gray')
 # plt.show()
 
-# Train the model
+#Train the model
 pretrain_model(model = generator_model,
                train_loader = TRAIN_LOADER,
                val_loader = VALID_LOADER,
-               num_epochs = 15,
-               lr = 2e-4,
+               num_epochs = EPOCHS,
+               lr = LEARNING_RATE,
                device = DEVICE,
                start_epoch = 0,
                checkpoint_dir = CHECKPOINT_DIR,
