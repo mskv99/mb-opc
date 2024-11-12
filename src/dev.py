@@ -1,30 +1,33 @@
 import cv2
 import torch
 import torchvision.transforms as transforms
-from models.model import Generator
-from data.dataset import OPCDataset, TestDataset, BinarizeTransform
 from torch.utils.data import DataLoader
 import os
 
-MODEL_PATH = 'checkpoints/exp_2/last_checkpoint.pth'
+from models.model import Generator
+from data.dataset import OPCDataset, TestDataset, BinarizeTransform
+from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE
+
+MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_3/last_checkpoint.pth')
 OUTPUT_DIR = 'inference/output_img'
-device = torch.device('cpu') # torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 generator_model = Generator(in_ch = 1, out_ch = 1)
-# # generator_model.load_state_dict(torch.load(MODEL_PATH,map_location=torch.device('cpu')))
-# generator_model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu'))['model_state_dict'])
-# generator_model = generator_model.to(device)
-# generator_model.eval()
-# print('Model initialized:', generator_model)
+# generator_model.load_state_dict(torch.load(MODEL_PATH,map_location=torch.device('cpu')))
+generator_model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu'))['model_state_dict'])
+generator_model = generator_model.to(device)
+generator_model.eval()
+print('Model initialized:', generator_model)
 
 
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
-
-  # single_channel_tensor = output[0].mean(dim=0)
-  # image = single_channel_tensor.numpy()
-  # blurred_image = cv2.GaussianBlur(image, (7,7),0)
-  # _, binarized_image = cv2.threshold(blurred_image, 0.5, 1.0, cv2.THRESH_BINARY)
-
+  '''
+  Example with applying blurring as a postprocessing step:
+  single_channel_tensor = output[0].mean(dim=0)
+  image = single_channel_tensor.numpy()
+  blurred_image = cv2.GaussianBlur(image, (7,7),0)
+  _, binarized_image = cv2.threshold(blurred_image, 0.5, 1.0, cv2.THRESH_BINARY)
+  '''
   single_image = output[0].squeeze(dim=0)
   print(f'Single image shape:{single_image.shape}')
   single_image[single_image > 0.5] = 1.0
@@ -43,10 +46,8 @@ TRANSFORM = transform = transforms.Compose([
     BinarizeTransform(threshold=0.5)
 ])
 
-BATCH_SIZE = 3
-
-TEST_DATASET = OPCDataset("/workarea/otdMDP/users/amoskovtsev/Pycharm_proj/MB_OPC/custom_unet/data/processed/gds_dataset/origin/test_origin",
-                          "/workarea/otdMDP/users/amoskovtsev/Pycharm_proj/MB_OPC/custom_unet/data/processed/gds_dataset/correction/test_correction",
+TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'),
+                          os.path.join(DATASET_PATH, 'correction/test_correction'),
                           transform = transform)
 
 # DataLoader
@@ -94,7 +95,7 @@ print(f'IoU loss:{iou_loss_value}')
 print(f'L2-loss:{mse_loss_value}')
 print(f'L2-loss shape:{mse_loss_value.shape}')
 #
-save_generated_image(target.sigmoid(), epoch=0, step=0, checkpoint_dir=OUTPUT_DIR, image_type='generated_test')
+save_generated_image(output.sigmoid(), epoch=0, step=0, checkpoint_dir=OUTPUT_DIR, image_type='generated_test')
 
 # for idx, (image, target) in enumerate(TEST_LOADER):
 #   with torch.no_grad():
