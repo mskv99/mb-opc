@@ -8,6 +8,6 @@ else:
   DATASET_PATH = 'data/processed/gds_dataset'
   CHECKPOINT_PATH = 'checkpoints'
 
-BATCH_SIZE = 1
+BATCH_SIZE = 3
 EPOCHS = 15
 LEARNING_RATE = 2e-4
