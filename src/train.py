@@ -12,6 +12,7 @@ import logging
 import os
 
 from models.model import Generator
+from utils import ContourLoss, IouLoss
 from data.dataset import OPCDataset, BinarizeTransform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
@@ -63,12 +64,12 @@ def iou_loss(pred, target, eps=1e-6):
   iou = (intersection + eps) / (union + eps)
   return 1 - iou.mean()
 
-criterion_mse = torch.nn.MSELoss()
 
 def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,device='cuda'):
   model.eval()
   l2_loss_epoch = 0
   iou_loss_epoch = 0
+  contour_loss_epoch = 0
   total_loss_epoch = 0
   # criterion_mse = nn.MSELoss()
   print(f"[Epoch {current_epoch}] Validating")
@@ -82,47 +83,86 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
       mask = torch.sigmoid(params)
       l2_loss_iter = criterion_mse(mask, target) # nn.MSELoss(mask, target)
       iou_loss_iter = iou_loss(mask, target)
-      total_loss_iter = l2_loss_iter + iou_loss_iter
-      # total_loss_iter_list.append(total_loss_iter.item())
+      contour_loss_iter = contour_loss(mask, target)
+      total_loss_iter = l2_loss_iter + iou_loss_iter + contour_loss_iter
 
       if idx % 10 == 0:
-        print(
-          f"Epoch [{current_epoch}/{num_epochs}], Step [{idx}/{len(val_loader)}], L2 Loss: {l2_loss_iter.item():.4f}, IoU Loss: {iou_loss_iter.item():.4f}, Total Loss: {total_loss_iter.item():.4f}")
-        logging.info(f"Epoch [{current_epoch}/{num_epochs}], Step [{idx}/{len(val_loader)}], L2 Loss: {l2_loss_iter.item():.4f}, IoU Loss: {iou_loss_iter.item():.4f}, Total Loss: {total_loss_iter.item():.4f}")
+        log_info_iter = {
+          'epoch': current_epoch,
+          'num_epochs': num_epochs,
+          'step': idx,
+          'len_train_loader': len(val_loader),
+          'l2_loss': l2_loss_iter.item(),
+          'iou_loss': iou_loss_iter.item(),
+          'contour_loss': contour_loss_iter.item(),
+          'total_loss': total_loss_iter.item(),
+        }
+
+        log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
+                       f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
+                       f"L2 Loss: {log_info_iter['l2_loss']:.4f}, "
+                       f"IoU Loss: {log_info_iter['iou_loss']:.4f}, "
+                       f"Contour Loss: {log_info_iter['contour_loss']:.4f}, "
+                       f"Total Loss: {log_info_iter['total_loss']:.4f}")
+
+        # Print and log the message
+        print(log_message_iter)
+        logging.info(log_message_iter)
+
       if idx % 200 == 0:
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
         save_generated_image(mask, current_epoch, idx, checkpoint_dir=checkpoint_dir, image_type='generated_correction_val')
 
       l2_loss_epoch += l2_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
+      contour_loss_epoch += contour_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
 
+    log_info_epoch = {
+      'epoch': current_epoch,
+      'num_epochs': num_epochs,
+      'len_train_loader': len(val_loader),
+      'l2_loss': l2_loss_epoch,
+      'iou_loss': iou_loss_epoch,
+      'contour_loss': contour_loss_epoch,
+      'total_loss': total_loss_epoch,
+    }
 
-    print(
-      f'[Losses per {current_epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(val_loader):.4f}, IoU loss={iou_loss_epoch/len(val_loader):.4f}, Total loss={total_loss_epoch/len(val_loader):.4f}')
-    logging.info(f'[Losses per {current_epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(val_loader):.4f}, IoU loss={iou_loss_epoch/len(val_loader):.4f}, Total loss={total_loss_epoch/len(val_loader):.4f}')
+    log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
+                        f"L2 Loss: {log_info_epoch['l2_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"Contour Loss: {log_info_epoch['contour_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}")
+
+    # Print and log the message
+    print(log_message_epoch)
+    logging.info(log_message_epoch)
+
 
   return total_loss_epoch / len(val_loader)
 
-def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device="cuda", start_epoch=0,
-                  checkpoint_dir="checkpoints", resume=False):
-  # Loss functions
-  # criterion_mse = nn.MSELoss()
-  model = model.to(device)
-  optimizer = optim.Adam(model.parameters(), lr = lr, weight_decay = 1e-5)
-  scheduler = lr_sched.StepLR(optimizer = optimizer, step_size = 2, gamma = 0.1)
-  print('Starting experiment...')
-  logging.info('Starting experiment...')
-
+def pretrain_model(model, train_loader,
+                   val_loader, num_epochs,
+                   lr = 2e-4, device = "cuda",
+                   start_epoch = 0,
+                   checkpoint_dir = "checkpoints",
+                   resume = False):
   # Load checkpoint if resuming
   if resume:
-    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/checkpoint_14.10.24.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
+    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
     model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer = optim.Adam(model.parameters())
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=2, gamma=0.1)
     start_epoch = checkpoint['epoch'] + 1
     print(f"Resuming training from epoch {start_epoch}")
     logging.info(f"Resuming training from epoch {start_epoch}")
-
+    model.to(device)
+  else:
+    optimizer = optim.Adam(model.parameters(), lr=lr, weigh_decay = 1e-5)
+    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=2, gamma=0.1)
+    print('Starting experiment...')
+    logging.info('Starting experiment...')
   total_loss_epoch_list_train = []
   total_loss_epoch_list_val = []
   total_loss_iter_list = []
@@ -130,6 +170,7 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
   for epoch in range(start_epoch, num_epochs):
     l2_loss_epoch = 0
     iou_loss_epoch = 0
+    contour_loss_epoch = 0
     total_loss_epoch = 0
 
     print(f"[Epoch {epoch}] Training")
@@ -146,7 +187,8 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
 
       l2_loss_iter = criterion_mse(mask, target)
       iou_loss_iter = iou_loss(mask, target)
-      total_loss_iter = l2_loss_iter + iou_loss_iter
+      contour_loss_iter = contour_loss(mask, target)
+      total_loss_iter = l2_loss_iter + iou_loss_iter + contour_loss_iter
       total_loss_iter_list.append(total_loss_iter.item())
 
       optimizer.zero_grad()
@@ -154,9 +196,27 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
       optimizer.step()
 
       if idx % 50 == 0:
-        print(
-          f"Epoch [{epoch}/{num_epochs}], Step [{idx}/{len(train_loader)}], L2 Loss: {l2_loss_iter.item():.4f}, IoU Loss: {iou_loss_iter.item():.4f}, Total Loss: {total_loss_iter.item():.4f}")
-        logging.info(f"Epoch [{epoch}/{num_epochs}], Step [{idx}/{len(train_loader)}], L2 Loss: {l2_loss_iter.item():.4f}, IoU Loss: {iou_loss_iter.item():.4f}, Total Loss: {total_loss_iter.item():.4f}")
+        # Create a dictionary to hold your log information
+        log_info_iter = {
+          'epoch': epoch,
+          'num_epochs': num_epochs,
+          'step': idx,
+          'len_train_loader': len(train_loader),
+          'l2_loss': l2_loss_iter.item(),
+          'iou_loss': iou_loss_iter.item(),
+          'contour_loss': contour_loss_iter.item(),
+          'total_loss': total_loss_iter.item(),
+        }
+
+        log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
+                       f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
+                       f"L2 Loss: {log_info_iter['l2_loss']:.4f}, "
+                       f"IoU Loss: {log_info_iter['iou_loss']:.4f}, "
+                       f"Contour Loss: {log_info_iter['contour_loss']:.4f}, "
+                       f"Total Loss: {log_info_iter['total_loss']:.4f}")
+
+        print(log_message_iter)
+        logging.info(log_message_iter)
 
         plt.figure(figsize=(8, 6))
         plt.plot(total_loss_iter_list, linestyle='-', label='train_iter_loss')
@@ -170,17 +230,9 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
       if idx % 200 == 0:
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
 
-        plt.figure(figsize=(8, 6))
-        plt.plot(total_loss_iter_list, linestyle='-', label='train_iter_loss')
-        plt.title('Iteration loss')
-        plt.xlabel('iteration')
-        plt.ylabel('loss')
-        plt.legend()
-        plt.savefig(os.path.join(checkpoint_dir, 'iter_loss_train.jpg'))
-        plt.close()
-
       l2_loss_epoch += l2_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
+      contour_loss_epoch += contour_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
 
       if idx % 500 == 0:
@@ -193,9 +245,26 @@ def pretrain_model(model, train_loader, val_loader, num_epochs, lr=2e-4, device=
         print(f"Saved checkpoint at {checkpoint_path}")
         logging.info(f"Saved checkpoint at {checkpoint_path}")
 
-    print(
-      f'[Losses per {epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(train_loader):.4f}, IoU loss={iou_loss_epoch/len(train_loader):.4f}, Total loss={total_loss_epoch/len(train_loader):.4f}')
-    logging.info(f'[Losses per {epoch}/{num_epochs} epoch:] L2 loss={l2_loss_epoch/len(train_loader):.4f}, IoU loss={iou_loss_epoch/len(train_loader):.4f}, Total loss={total_loss_epoch/len(train_loader):.4f}')
+
+    log_info_epoch = {
+      'epoch': epoch,
+      'num_epochs': num_epochs,
+      'len_train_loader': len(train_loader),
+      'l2_loss': l2_loss_epoch,
+      'iou_loss': iou_loss_epoch,
+      'contour_loss': contour_loss_epoch,
+      'total_loss': total_loss_epoch,
+    }
+
+    log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
+                        f"L2 Loss: {log_info_epoch['l2_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"Contour Loss: {log_info_epoch['contour_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}")
+
+    print(log_message_epoch)
+    logging.info(log_message_epoch)
+
     total_loss_epoch_list_train.append(total_loss_epoch / len(train_loader))
     total_loss_epoch_val = validate_model(model, val_loader, current_epoch = epoch, num_epochs=num_epochs, checkpoint_dir = checkpoint_dir, device = device)
     total_loss_epoch_list_val.append(total_loss_epoch_val)
@@ -256,18 +325,27 @@ print(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
 logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
 logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
-logging.ingo(f'Number of images in test subset:{len(TEST_DATASET)}\n')
+logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
 image, target = next(iter(TRAIN_LOADER))
+image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
 print(f'Target shape: {target.shape}')
 print(f'Image shape after removing batch dimension: {image[0,0].shape}')
 
 # Выполним проверку подсчёта функций потерь
+generator_model = generator_model.to(DEVICE)
 output = generator_model(image)
 print(f'Output shape: {output.shape}')
+
+iou_loss = IouLoss(weight=1.0)
+contour_loss = ContourLoss(weight=1.0, device=DEVICE)
+criterion_mse = torch.nn.MSELoss()
+
 iou_loss_value = iou_loss(target, output.sigmoid())
-mse_loss_value = torch.nn.functional.mse_loss(output.sigmoid(), target)
+mse_loss_value = criterion_mse(output.sigmoid(), target)
+contour_loss_value = contour_loss(output.sigmoid(), target)
+
 
 print(f'IoU loss:{iou_loss_value}')
 print(f'L1-loss:{mse_loss_value}')
@@ -286,4 +364,4 @@ pretrain_model(model = generator_model,
                device = DEVICE,
                start_epoch = 0,
                checkpoint_dir = CHECKPOINT_DIR,
-               resume=False)
+               resume=True)

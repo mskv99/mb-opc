@@ -99,8 +99,6 @@ class IouLoss(nn.Module):
     intersection = (pred * target).sum(dim=(2, 3))
     union = (pred + target).sum(dim=(2, 3)) - intersection
     iou = (intersection + self.eps) / (union + self.eps)
-    print(f'IoU shape:{iou.shape}')
-    print(f'IoU value:{iou}')
     return (1 - iou.mean()) * self.weight
 
 boundary_loss = BoundaryLoss(weight=1.0)
