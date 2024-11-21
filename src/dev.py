@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from models.model import Generator
 from data.dataset import OPCDataset, TestDataset, BinarizeTransform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE
-from utils import BoundaryLoss, TVLoss
+from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss
 
 matplotlib.use('Agg')
 
@@ -40,8 +40,6 @@ def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", imag
 
   img_save_path = os.path.join(checkpoint_dir, f"{image_type}_epoch{epoch}_step{step}.jpg")
   cv2.imwrite(f"{img_save_path}", (single_image * 255).detach().cpu().numpy())
-  # saved_img = Image.open(img_save_path)
-  # saved_img.show()
   print(f"Saved generated image at {img_save_path}")
 
 TRANSFORM = transform = transforms.Compose([
@@ -55,18 +53,14 @@ TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'),
                           os.path.join(DATASET_PATH, 'correction/test_correction'),
                           transform = transform)
 
-# DataLoader
 TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = True)
 
-def iou_loss(pred, target, eps=1e-6):
-  intersection = (pred * target).sum(dim=(2, 3))
-  union = (pred + target).sum(dim=(2, 3)) - intersection
-  iou = (intersection + eps) / (union + eps)
-  print(f'IoU shape:{iou.shape}')
-  print(f'IoU value:{iou}')
-  return 1 - iou.mean()
-
+# define loss functions
 tv_loss = TVLoss(weight=1.0)
+contour_loss = ContourLoss(weight=1.0, device=DEVICE)
+mse_loss = torch.nn.MSELoss()
+iou_loss = IouLoss(weight=1.0)
+
 image, target = next(iter(TEST_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
@@ -74,48 +68,20 @@ print(f'Slice from image: {image[:1].shape}')
 print(f'Target shape: {target.shape}')
 print(f'Image shape after removing batch dimension: {image[0,0].shape}')
 
-sobel_x = torch.tensor([[1, 0, -1], [2, 0, -2], [1,0,-1]], dtype = torch.float32, device = DEVICE).view(1,1,3,3)
-sobel_y = torch.tensor([[1,2,1], [0,0,0], [-1, -2, -1]], dtype = torch.float32, device = DEVICE).view(1,1,3,3)
-print(sobel_x)
-print(sobel_x.shape)
-
-# Calculating sobel edges for target
-target_upsampled = torch.nn.functional.interpolate(target, scale_factor=2, mode='bilinear', align_corners=True)
-
-target_edge_x = torch.nn.functional.conv2d(target_upsampled, sobel_x, padding = 1)
-target_edge_y = torch.nn.functional.conv2d(target_upsampled, sobel_y, padding = 1)
-target_edge = torch.sqrt(target_edge_x ** 2 + target_edge_y ** 2 + 1e-6)
-
-target_edge_image = target_edge.squeeze().cpu().numpy()
-plt.imshow(target_edge_image, cmap='gray')
-#plt.colorbar()
-plt.title('Tensor image')
-plt.axis('off')
-plt.savefig('data/external/target_sobel_edges.png')
-# plt.show()
-
 with torch.no_grad():
-  pred = generator_model(image)
-pred_upsampled = torch.nn.functional.interpolate(pred, scale_factor=2, mode='bilinear', align_corners=True)
-pred_edge_x = torch.nn.functional.conv2d(pred_upsampled.sigmoid(), sobel_x, padding = 1)
-pred_edge_y = torch.nn.functional.conv2d(pred_upsampled.sigmoid(), sobel_y, padding = 1)
-pred_edge = torch.sqrt(pred_edge_x ** 2 + pred_edge_y ** 2 + 1e-6)
+  pred = generator_model(image).sigmoid()
 
-pred_edge_image = pred_edge.squeeze().cpu().numpy()
-plt.imshow(pred_edge_image, cmap='gray')
-#plt.colorbar()
-plt.title('Tensor image')
-plt.axis('off')
-plt.savefig('data/external/pred_sobel_edges.png')
-# plt.show()
-
-boundary_diff = torch.abs(pred_edge - target_edge)
-print(boundary_diff.mean())
-
+contour_loss_iter = contour_loss(pred, target)
+mse_loss_iter = mse_loss(pred, target)
+iou_loss_iter = iou_loss(pred, target)
 tv_loss_pred = tv_loss(pred.sigmoid())
+total_loss = mse_loss_iter + contour_loss_iter + iou_loss_iter
+print(f'contour loss:{contour_loss_iter}')
+
+print(f'mse loss:{mse_loss_iter}')
+print(f'iou_loss:{iou_loss_iter}')
 print(f'tv loss pred:{tv_loss_pred}')
-tv_loss_target = tv_loss(target.sigmoid())
-print(f'tv loss target:{tv_loss_target}')
+print(total_loss)
 
 # # 1. Find the maximum values across the last two dimensions
 # max_across_width, _ = image.max(dim=(-1))

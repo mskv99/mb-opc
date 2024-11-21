@@ -27,12 +27,37 @@ class BoundaryLoss(nn.Module):
     boundary_loss = torch.mean(pred * dist_maps)
     return torch.from_numpy(self.weight * boundary_loss)
 
+class ContourLoss(nn.Module):
+  def __init__(self, weight=1.0, device='cpu'):
+    super(ContourLoss, self).__init__()
+    self.weight = weight
+    self.device = device
+    self.sobel_kernel_x = torch.tensor([[1, 0, -1], [2, 0, -2], [1,0,-1]], dtype = torch.float32, device = device).view(1,1,3,3)
+    self.sobel_kernel_y = torch.tensor([[1,2,1], [0,0,0], [-1, -2, -1]], dtype = torch.float32, device = device).view(1,1,3,3)
+  def forward(self, pred, target):
+    target_edge_x = torch.nn.functional.conv2d(target, self.sobel_kernel_x, padding = 1)
+    target_edge_y = torch.nn.functional.conv2d(target, self.sobel_kernel_y, padding = 1)
+    target_edge = torch.sqrt(target_edge_x ** 2 + target_edge_y ** 2 + 1e-6)
+
+    pred_edge_x = torch.nn.functional.conv2d(pred, self.sobel_kernel_x, padding = 1)
+    pred_edge_y = torch.nn.functional.conv2d(pred, self.sobel_kernel_y, padding = 1)
+    pred_edge = torch.sqrt(pred_edge_x ** 2 + pred_edge_y ** 2 + 1e-6)
+
+    # calculate difference for every predicted and target correction in a batch
+    loss_per_image = torch.abs(pred_edge - target_edge).sum(dim=(1,2,3)) # (N, ), sum over height, width and channels
+    # calculate the contour area for every target correction in a batch
+    target_edge_sum = target_edge.sum(dim=(1,2,3)) + 1e-6 # (N, ) sum over height, width, and prevent division by zero
+    # normalise the difference by the contour area of target correction
+    mean_loss = (loss_per_image / target_edge_sum) * self.weight
+
+    # return mean value over a batch
+    return mean_loss.mean()  # (),
+
 class TVLoss(nn.Module):
   def __init__(self, weight=1.0):
     super(TVLoss, self).__init__()
     self.weight = weight
   def forward(self, x):
-
     tv_loss = torch.sum(torch.abs(x[:,:,1:,:] - x[:, :, :-1, :])) + torch.sum(torch.abs(x[:,:,:,1:] - x[:, :, :, :-1]))
     return self.weight * tv_loss
 
@@ -57,7 +82,6 @@ class PerceptualLoss(nn.Module):
       perceptual_loss += F.l1_loss(pred, target)
     return self.weight * perceptual_loss
 
-
   @staticmethod
   def normalize_input(x):
     # Normalize according to VGG preprocessing
@@ -65,6 +89,19 @@ class PerceptualLoss(nn.Module):
     std = torch.tensor([0.229, 0.224, 0.225]).to(x.device)
     x = (x - mean[None, :, None, None]) / std[None, :, None, None]
     return x
+
+class IouLoss(nn.Module):
+  def __init__(self, weight=1.0, eps=1e-6):
+    super(IouLoss, self).__init__()
+    self.weight = weight
+    self.eps = eps
+  def forward(self, pred, target):
+    intersection = (pred * target).sum(dim=(2, 3))
+    union = (pred + target).sum(dim=(2, 3)) - intersection
+    iou = (intersection + self.eps) / (union + self.eps)
+    print(f'IoU shape:{iou.shape}')
+    print(f'IoU value:{iou}')
+    return (1 - iou.mean()) * self.weight
 
 boundary_loss = BoundaryLoss(weight=1.0)
 perceptual_loss = PerceptualLoss(weight=0.5)
