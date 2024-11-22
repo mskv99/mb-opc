@@ -122,10 +122,10 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
       'epoch': current_epoch,
       'num_epochs': num_epochs,
       'len_train_loader': len(val_loader),
-      'l2_loss': l2_loss_epoch.item(),
-      'iou_loss': iou_loss_epoch.item(),
-      'contour_loss': contour_loss_epoch.item(),
-      'total_loss': total_loss_epoch.item(),
+      'l2_loss': l2_loss_epoch,
+      'iou_loss': iou_loss_epoch,
+      'contour_loss': contour_loss_epoch,
+      'total_loss': total_loss_epoch,
     }
 
     log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
@@ -147,23 +147,22 @@ def pretrain_model(model, train_loader,
                    start_epoch = 0,
                    checkpoint_dir = "checkpoints",
                    resume = False):
-  # Loss functions
-  # criterion_mse = nn.MSELoss()
-  model = model.to(device)
-  optimizer = optim.Adam(model.parameters(), lr = lr, weight_decay = 1e-5)
-  scheduler = lr_sched.StepLR(optimizer = optimizer, step_size = 2, gamma = 0.1)
-  print('Starting experiment...')
-  logging.info('Starting experiment...')
-
   # Load checkpoint if resuming
   if resume:
-    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/checkpoint_14.10.24.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
+    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
     model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer = optim.Adam(model.parameters())
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=2, gamma=0.1)
     start_epoch = checkpoint['epoch'] + 1
     print(f"Resuming training from epoch {start_epoch}")
     logging.info(f"Resuming training from epoch {start_epoch}")
-
+    model.to(device)
+  else:
+    optimizer = optim.Adam(model.parameters(), lr=lr, weigh_decay = 1e-5)
+    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=2, gamma=0.1)
+    print('Starting experiment...')
+    logging.info('Starting experiment...')
   total_loss_epoch_list_train = []
   total_loss_epoch_list_val = []
   total_loss_iter_list = []
@@ -251,10 +250,10 @@ def pretrain_model(model, train_loader,
       'epoch': epoch,
       'num_epochs': num_epochs,
       'len_train_loader': len(train_loader),
-      'l2_loss': l2_loss_epoch.item(),
-      'iou_loss': iou_loss_epoch.item(),
-      'contour_loss': contour_loss_epoch.item(),
-      'total_loss': total_loss_epoch.item(),
+      'l2_loss': l2_loss_epoch,
+      'iou_loss': iou_loss_epoch,
+      'contour_loss': contour_loss_epoch,
+      'total_loss': total_loss_epoch,
     }
 
     log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
@@ -326,17 +325,19 @@ print(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
 logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
 logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
-logging.ingo(f'Number of images in test subset:{len(TEST_DATASET)}\n')
+logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
 image, target = next(iter(TRAIN_LOADER))
+image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
 print(f'Target shape: {target.shape}')
 print(f'Image shape after removing batch dimension: {image[0,0].shape}')
 
 # Выполним проверку подсчёта функций потерь
+generator_model = generator_model.to(DEVICE)
 output = generator_model(image)
 print(f'Output shape: {output.shape}')
-wi
+
 iou_loss = IouLoss(weight=1.0)
 contour_loss = ContourLoss(weight=1.0, device=DEVICE)
 criterion_mse = torch.nn.MSELoss()
@@ -363,4 +364,4 @@ pretrain_model(model = generator_model,
                device = DEVICE,
                start_epoch = 0,
                checkpoint_dir = CHECKPOINT_DIR,
-               resume=False)
+               resume=True)
