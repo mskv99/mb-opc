@@ -1,13 +1,14 @@
-import os
 import cv2
 import torch
 import argparse
 import time
+import os
 from models.model import *
 from data.dataset import *
 import torchvision.transforms as transforms
 from models.model import Generator
 from data.dataset import OPCDataset, TestDataset, BinarizeTransform
+from utils import get_next_experiment_folder
 from torch.utils.data import DataLoader
 
 
@@ -17,7 +18,7 @@ args = parser.parse_args()
 
 DATA_PATH = args.inference_folder # 'input_img/cell15_padded_input_label.jpg'
 MODEL_PATH = 'checkpoints/exp_3/last_checkpoint.pth'
-OUTPUT_DIR = 'inference/output_img/exp_4'
+OUTPUT_DIR = get_next_experiment_folder('inference/output_img')
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Running inference on device: {device}')
 

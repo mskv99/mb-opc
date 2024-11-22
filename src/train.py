@@ -12,7 +12,7 @@ import logging
 import os
 
 from models.model import Generator
-from utils import ContourLoss, IouLoss
+from utils import ContourLoss, IouLoss, get_next_experiment_folder
 from data.dataset import OPCDataset, BinarizeTransform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
@@ -36,20 +36,6 @@ def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", imag
   print(f"Saved generated image at {img_save_path}")
   logging.info(f"Saved generated image at {img_save_path}")
 
-def get_next_experiment_folder(checkpoints_dir):
-  # Ensure the checkpoints directory exists
-  if not os.path.exists(checkpoints_dir):
-    os.makedirs(checkpoints_dir)
-
-  # Find the next available experiment number
-  exp_number = 1
-  while True:
-    exp_folder = os.path.join(checkpoints_dir, f'exp_{exp_number}')
-    if not os.path.exists(exp_folder):
-      os.makedirs(exp_folder)
-      return exp_folder
-    exp_number += 1
-
 def setup_logging(exp_folder):
   # Set up logging configuration
   log_file_path = os.path.join(exp_folder, 'training_log.txt')
@@ -57,13 +43,6 @@ def setup_logging(exp_folder):
                       level = logging.INFO,
                       datefmt = '%d/%m/%Y %H:%M')
   # logging.info("Training log started")
-
-def iou_loss(pred, target, eps=1e-6):
-  intersection = (pred * target).sum(dim=(2, 3))
-  union = (pred + target).sum(dim=(2, 3)) - intersection
-  iou = (intersection + eps) / (union + eps)
-  return 1 - iou.mean()
-
 
 def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,device='cuda'):
   model.eval()

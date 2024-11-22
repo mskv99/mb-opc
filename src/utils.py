@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy.ndimage import distance_transform_edt
 from torchvision import models
+import os
 
 def compute_distance_map(mask):
   '''
@@ -100,6 +101,20 @@ class IouLoss(nn.Module):
     union = (pred + target).sum(dim=(2, 3)) - intersection
     iou = (intersection + self.eps) / (union + self.eps)
     return (1 - iou.mean()) * self.weight
+
+def get_next_experiment_folder(checkpoints_dir):
+  # Ensure the checkpoints directory exists
+  if not os.path.exists(checkpoints_dir):
+    os.makedirs(checkpoints_dir)
+
+  # Find the next available experiment number
+  exp_number = 1
+  while True:
+    exp_folder = os.path.join(checkpoints_dir, f'exp_{exp_number}')
+    if not os.path.exists(exp_folder):
+      os.makedirs(exp_folder)
+      return exp_folder
+    exp_number += 1
 
 boundary_loss = BoundaryLoss(weight=1.0)
 perceptual_loss = PerceptualLoss(weight=0.5)
