@@ -19,7 +19,7 @@ args = parser.parse_args()
 DATA_PATH = args.inference_folder # 'data/processed/gds_dataset/origin/test_origin'
 MODEL_PATH = 'checkpoints/exp_3/last_checkpoint.pth'
 OUTPUT_DIR = get_next_experiment_folder('inference/output_img')
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') # 'cpu'
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Running inference on device: {device}')
 
 def save_image(output_batch, checkpoint_dir="checkpoints", image_type='true_correction'):
