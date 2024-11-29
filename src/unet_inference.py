@@ -16,20 +16,22 @@ parser = argparse.ArgumentParser(description = 'Performing inference on topology
 parser.add_argument('inference_folder', type = str, help = 'Relative path to an inference image folder')
 args = parser.parse_args()
 
-DATA_PATH = args.inference_folder # 'input_img/cell15_padded_input_label.jpg'
+DATA_PATH = args.inference_folder # 'data/processed/gds_dataset/origin/test_origin'
 MODEL_PATH = 'checkpoints/exp_3/last_checkpoint.pth'
 OUTPUT_DIR = get_next_experiment_folder('inference/output_img')
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') # 'cpu'
 print(f'Running inference on device: {device}')
 
-def save_image(output, checkpoint_dir="checkpoints", image_type='true_correction'):
-    single_image = output[0].squeeze(dim=0)
-    single_image[single_image > 0.5] = 1.0
-    single_image[single_image <= 0.5] = 0.0
+def save_image(output_batch, checkpoint_dir="checkpoints", image_type='true_correction'):
+    for i,output in enumerate(output_batch):
+        single_image = output.squeeze(dim=0)
+        single_image[single_image > 0.5] = 1.0
+        single_image[single_image <= 0.5] = 0.0
 
-    img_save_path = os.path.join(checkpoint_dir, f"{image_type}.png")
-    cv2.imwrite(f"{img_save_path}", (single_image*255).detach().cpu().numpy())
-    print(f"Saved generated image at {img_save_path}")
+        single_image_path = image_type[i].split('/')[-1][:-4]
+        img_save_path = os.path.join(checkpoint_dir, f"{single_image_path}.png")
+        cv2.imwrite(f"{img_save_path}", (single_image*255).detach().cpu().numpy())
+        print(f"Saved generated image at {img_save_path}")
 
 generator_model = Generator(in_ch = 1, out_ch = 1)
 # generator_model.load_state_dict(torch.load(MODEL_PATH,map_location=torch.device('cpu')))
@@ -37,6 +39,7 @@ generator_model.load_state_dict(torch.load(MODEL_PATH, map_location = device)['m
 generator_model = generator_model.to(device)
 generator_model.eval()
 print('Model initialized:', generator_model)
+print(f'Total number of parametres in neural network:{sum(p.numel() for p in generator_model.parameters())}')
 
 TRANSFORM = transforms.Compose([
     transforms.Resize((1024, 1024)),
@@ -51,14 +54,14 @@ TEST_DATASET = TestDataset(DATA_PATH, transform=TRANSFORM)
 # DataLoader
 TEST_LOADER = DataLoader(TEST_DATASET, batch_size=1, shuffle=False)
 
-for idx, (image, image_path) in enumerate(TEST_LOADER):
+for idx, (batch, batch_path) in enumerate(TEST_LOADER):
     start_time = time.time()
-    image = image.to(device)
-    image_name = image_path[0].split('/')[-1][:-4]
+    batch = batch.to(device)
+    #batch_name = batch_path[0].split('/')[-1][:-4]
     with torch.no_grad():
-        output = generator_model(image)
-        output_mask = torch.sigmoid(output)
-    save_image(output_mask, checkpoint_dir = OUTPUT_DIR, image_type = image_name)
+        output_batch = generator_model(batch)
+        output_mask = torch.sigmoid(output_batch)
+    save_image(output_mask, checkpoint_dir = OUTPUT_DIR, image_type = batch_path)
     end_time = time.time()
     print(f'Performed inference within:{end_time - start_time} seconds')
 
