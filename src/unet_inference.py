@@ -1,6 +1,7 @@
 import cv2
 import torch
 import argparse
+import numpy as np
 import time
 import os
 from models.model import *
@@ -9,16 +10,19 @@ import torchvision.transforms as transforms
 from models.model import Generator
 from data.dataset import OPCDataset, TestDataset, BinarizeTransform
 from utils import get_next_experiment_folder
+from config import CHECKPOINT_PATH
 from torch.utils.data import DataLoader
 
 
 parser = argparse.ArgumentParser(description = 'Performing inference on topology images')
 parser.add_argument('inference_folder', type = str, help = 'Relative path to an inference image folder')
+parser.add_argument('--batch_size', type = int, default = 2, help = 'Batch size for inference')
 args = parser.parse_args()
 
 DATA_PATH = args.inference_folder # 'data/processed/gds_dataset/origin/test_origin'
-MODEL_PATH = 'checkpoints/exp_3/last_checkpoint.pth'
+MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_3/last_checkpoint.pth') #'/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth'
 OUTPUT_DIR = get_next_experiment_folder('inference/output_img')
+BATCH_SIZE = args.batch_size
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Running inference on device: {device}')
 
@@ -50,9 +54,9 @@ TRANSFORM = transforms.Compose([
 
 # Dataset paths
 TEST_DATASET = TestDataset(DATA_PATH, transform=TRANSFORM)
-
 # DataLoader
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size=1, shuffle=False)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle=False)
+time_list= []
 
 for idx, (batch, batch_path) in enumerate(TEST_LOADER):
     start_time = time.time()
@@ -64,6 +68,11 @@ for idx, (batch, batch_path) in enumerate(TEST_LOADER):
     save_image(output_mask, checkpoint_dir = OUTPUT_DIR, image_type = batch_path)
     end_time = time.time()
     print(f'Performed inference within:{end_time - start_time} seconds')
+    time_list.append(end_time - start_time)
+
+time_array = np.array(time_list)
+print(f'Mean inference time for a single batch of {BATCH_SIZE} images: {time_array.mean()}')
+print(f'Mean inference time for a single image: {time_array.mean() / BATCH_SIZE}')
 
 '''
 Below is the example of wrong inference which can lead to 

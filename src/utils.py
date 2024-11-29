@@ -116,9 +116,6 @@ def get_next_experiment_folder(checkpoints_dir):
       return exp_folder
     exp_number += 1
 
-boundary_loss = BoundaryLoss(weight=1.0)
-perceptual_loss = PerceptualLoss(weight=0.5)
-
 '''
 for images, targets in dataloader:
   preds = model(images)
