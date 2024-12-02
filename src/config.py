@@ -5,7 +5,7 @@ if os.getenv('ENV') == 'TRAIN_MACHINE':
   CHECKPOINT_PATH = '/mnt/data/amoskovtsev/mb_opc/checkpoints'
 
 else:
-  DATASET_PATH = 'data/processed/gds_dataset'
+  DATASET_PATH = '/workarea/otdMDP/users/amoskovtsev/Pycharm_proj/MB_OPC/custom_unet/data/processed/gds_dataset'
   CHECKPOINT_PATH = 'checkpoints'
 
 BATCH_SIZE = 3
