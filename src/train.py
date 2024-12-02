@@ -13,7 +13,7 @@ import os
 
 from models.model import Generator
 from utils import ContourLoss, IouLoss, get_next_experiment_folder
-from data.dataset import OPCDataset, BinarizeTransform
+from data.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
 def set_random_seed(seed):
@@ -280,33 +280,38 @@ output = generator_model.forward(test_image)
 print(f'Output shape: {output.shape}')
 print(f'Output shape: {torch.sigmoid(output).shape}')
 
-TRANSFORM = transforms.Compose([
-    transforms.Resize((1024, 1024)),
-    transforms.ToTensor(),
-    transforms.Grayscale(),
-    BinarizeTransform(threshold=0.5)
-])
-
 logging.info(f'Batch size:{BATCH_SIZE}')
 # Define dataset
-TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = TRANSFORM)
-VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = TRANSFORM)
-TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = TRANSFORM)
+TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform())
+VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform())
+TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform())
 
 # Define dataloader
 TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
 VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
 TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
 
-print(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
-print(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
+print(f'Number of images in train subset:{len(TRAIN_DATASET)}')
+print(f'Number of images in valid subset:{len(VALID_DATASET)}')
 print(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
-logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}\n')
-logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
+logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}')
+logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}')
 logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
-image, target = next(iter(TRAIN_LOADER))
+# Normalizing the data
+print(f'Calculating mean and standard deviation for a dataset')
+logging.info(f'Calculating mean and standard deviation for a dataset')
+train_mean, train_std = calculate_mean_std(TRAIN_LOADER)
+print(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
+logging.info(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
+# Create a normalized version of dataset and dataloader
+NORM_TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(mean = train_mean , std = train_std))
+NORM_VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(mean = train_mean, std = train_std))
+NORM_TRAIN_LOADER = DataLoader(NORM_TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
+NORM_VALID_LOADER = DataLoader(NORM_VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
+
+image, target = next(iter(NORM_TRAIN_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
 print(f'Target shape: {target.shape}')
@@ -336,8 +341,8 @@ print(f'L1-loss shape:{mse_loss_value.shape}')
 
 #Train the model
 pretrain_model(model = generator_model,
-               train_loader = TRAIN_LOADER,
-               val_loader = VALID_LOADER,
+               train_loader = NORM_TRAIN_LOADER,
+               val_loader = NORM_VALID_LOADER,
                num_epochs = EPOCHS,
                lr = LEARNING_RATE,
                device = DEVICE,
