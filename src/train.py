@@ -9,11 +9,12 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import logging
+import time
 import os
 
 from models.model import Generator
-from utils import ContourLoss, IouLoss, get_next_experiment_folder
-from data.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
+from utils import ContourLoss, IouLoss, get_next_experiment_folder, next_exp_folder
+from dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
 def set_random_seed(seed):
@@ -46,7 +47,7 @@ def setup_logging(exp_folder):
 
 def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,device='cuda'):
   model.eval()
-  l2_loss_epoch = 0
+  l1_loss_epoch = 0
   iou_loss_epoch = 0
   contour_loss_epoch = 0
   total_loss_epoch = 0
@@ -60,10 +61,10 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
 
       params = model(image)
       mask = torch.sigmoid(params)
-      l2_loss_iter = criterion_mse(mask, target) # nn.MSELoss(mask, target)
+      l1_loss_iter = l1_loss(mask, target)
+      # l2_loss_iter = criterion_mse(mask, target) # nn.MSELoss(mask, target)
       iou_loss_iter = iou_loss(mask, target)
-      contour_loss_iter = contour_loss(mask, target)
-      total_loss_iter = l2_loss_iter + iou_loss_iter + contour_loss_iter
+      total_loss_iter = l1_loss_iter + iou_loss_iter
 
       if idx % 10 == 0:
         log_info_iter = {
@@ -71,17 +72,15 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
           'num_epochs': num_epochs,
           'step': idx,
           'len_train_loader': len(val_loader),
-          'l2_loss': l2_loss_iter.item(),
+          'l1_loss': l1_loss_iter.item(),
           'iou_loss': iou_loss_iter.item(),
-          'contour_loss': contour_loss_iter.item(),
           'total_loss': total_loss_iter.item(),
         }
 
         log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
                        f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
-                       f"L2 Loss: {log_info_iter['l2_loss']:.4f}, "
+                       f"L1 Loss: {log_info_iter['l1_loss']:.4f}, "
                        f"IoU Loss: {log_info_iter['iou_loss']:.4f}, "
-                       f"Contour Loss: {log_info_iter['contour_loss']:.4f}, "
                        f"Total Loss: {log_info_iter['total_loss']:.4f}")
 
         # Print and log the message
@@ -92,25 +91,22 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
         save_generated_image(mask, current_epoch, idx, checkpoint_dir=checkpoint_dir, image_type='generated_correction_val')
 
-      l2_loss_epoch += l2_loss_iter.item()
+      l1_loss_epoch += l1_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
-      contour_loss_epoch += contour_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
 
     log_info_epoch = {
       'epoch': current_epoch,
       'num_epochs': num_epochs,
       'len_train_loader': len(val_loader),
-      'l2_loss': l2_loss_epoch,
+      'l1_loss': l1_loss_epoch,
       'iou_loss': iou_loss_epoch,
-      'contour_loss': contour_loss_epoch,
       'total_loss': total_loss_epoch,
     }
 
     log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
-                        f"L2 Loss: {log_info_epoch['l2_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"L1 Loss: {log_info_epoch['l1_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
                         f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
-                        f"Contour Loss: {log_info_epoch['contour_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
                         f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}")
 
     # Print and log the message
@@ -132,14 +128,15 @@ def pretrain_model(model, train_loader,
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer = optim.Adam(model.parameters())
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=2, gamma=0.1)
+    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=5, gamma=0.5)
     start_epoch = checkpoint['epoch'] + 1
     print(f"Resuming training from epoch {start_epoch}")
     logging.info(f"Resuming training from epoch {start_epoch}")
     model.to(device)
   else:
-    optimizer = optim.Adam(model.parameters(), lr=lr, weigh_decay = 1e-5)
-    scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=2, gamma=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay = 1e-5)
+    # scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=5, gamma=0.5)
+    scheduler = lr_sched.CosineAnnealingLR(optimizer=optimizer, T_max=25, eta_min=1e-6)
     print('Starting experiment...')
     logging.info('Starting experiment...')
   total_loss_epoch_list_train = []
@@ -147,9 +144,9 @@ def pretrain_model(model, train_loader,
   total_loss_iter_list = []
 
   for epoch in range(start_epoch, num_epochs):
-    l2_loss_epoch = 0
+    # l2_loss_epoch = 0
+    l1_loss_epoch = 0
     iou_loss_epoch = 0
-    contour_loss_epoch = 0
     total_loss_epoch = 0
 
     print(f"[Epoch {epoch}] Training")
@@ -164,10 +161,10 @@ def pretrain_model(model, train_loader,
       params = model(image)
       mask = torch.sigmoid(params)
 
-      l2_loss_iter = criterion_mse(mask, target)
+      # l2_loss_iter = criterion_mse(mask, target)
+      l1_loss_iter = l1_loss(mask, target)
       iou_loss_iter = iou_loss(mask, target)
-      contour_loss_iter = contour_loss(mask, target)
-      total_loss_iter = l2_loss_iter + iou_loss_iter + contour_loss_iter
+      total_loss_iter = l1_loss_iter + iou_loss_iter
       total_loss_iter_list.append(total_loss_iter.item())
 
       optimizer.zero_grad()
@@ -181,17 +178,15 @@ def pretrain_model(model, train_loader,
           'num_epochs': num_epochs,
           'step': idx,
           'len_train_loader': len(train_loader),
-          'l2_loss': l2_loss_iter.item(),
+          'l1_loss': l1_loss_iter.item(),
           'iou_loss': iou_loss_iter.item(),
-          'contour_loss': contour_loss_iter.item(),
           'total_loss': total_loss_iter.item(),
         }
 
         log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
                        f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
-                       f"L2 Loss: {log_info_iter['l2_loss']:.4f}, "
+                       f"L1 Loss: {log_info_iter['l1_loss']:.4f}, "
                        f"IoU Loss: {log_info_iter['iou_loss']:.4f}, "
-                       f"Contour Loss: {log_info_iter['contour_loss']:.4f}, "
                        f"Total Loss: {log_info_iter['total_loss']:.4f}")
 
         print(log_message_iter)
@@ -209,9 +204,8 @@ def pretrain_model(model, train_loader,
       if idx % 200 == 0:
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
 
-      l2_loss_epoch += l2_loss_iter.item()
+      l1_loss_epoch += l1_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
-      contour_loss_epoch += contour_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
 
       if idx % 500 == 0:
@@ -229,16 +223,14 @@ def pretrain_model(model, train_loader,
       'epoch': epoch,
       'num_epochs': num_epochs,
       'len_train_loader': len(train_loader),
-      'l2_loss': l2_loss_epoch,
+      'l1_loss': l1_loss_epoch,
       'iou_loss': iou_loss_epoch,
-      'contour_loss': contour_loss_epoch,
       'total_loss': total_loss_epoch,
     }
 
     log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
-                        f"L2 Loss: {log_info_epoch['l2_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
+                        f"L1 Loss: {log_info_epoch['l1_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
                         f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
-                        f"Contour Loss: {log_info_epoch['contour_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
                         f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}")
 
     print(log_message_epoch)
@@ -264,7 +256,7 @@ def pretrain_model(model, train_loader,
   print('Traning complete')
   logging.info('Traning complete')
 
-CHECKPOINT_DIR = get_next_experiment_folder(CHECKPOINT_PATH)
+CHECKPOINT_DIR = next_exp_folder(CHECKPOINT_PATH)
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 setup_logging(CHECKPOINT_DIR)
@@ -300,18 +292,18 @@ logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}')
 logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
 # Normalizing the data
-print(f'Calculating mean and standard deviation for a dataset')
-logging.info(f'Calculating mean and standard deviation for a dataset')
-train_mean, train_std = calculate_mean_std(TRAIN_LOADER)
-print(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
-logging.info(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
+#print(f'Calculating mean and standard deviation for a dataset')
+#logging.info(f'Calculating mean and standard deviation for a dataset')
+#train_mean, train_std = calculate_mean_std(TRAIN_LOADER)
+#print(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
+#logging.info(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
 # Create a normalized version of dataset and dataloader
-NORM_TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(mean = train_mean , std = train_std))
-NORM_VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(mean = train_mean, std = train_std))
-NORM_TRAIN_LOADER = DataLoader(NORM_TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
-NORM_VALID_LOADER = DataLoader(NORM_VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
+#NORM_TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(mean = train_mean , std = train_std))
+#NORM_VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(mean = train_mean, std = train_std))
+#NORM_TRAIN_LOADER = DataLoader(NORM_TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
+#NORM_VALID_LOADER = DataLoader(NORM_VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
 
-image, target = next(iter(NORM_TRAIN_LOADER))
+image, target = next(iter(TRAIN_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
 print(f'Target shape: {target.shape}')
@@ -323,29 +315,38 @@ output = generator_model(image)
 print(f'Output shape: {output.shape}')
 
 iou_loss = IouLoss(weight=1.0)
-contour_loss = ContourLoss(weight=1.0, device=DEVICE)
-criterion_mse = torch.nn.MSELoss()
+# criterion_mse = torch.nn.MSELoss()
+l1_loss = torch.nn.L1Loss()
 
 iou_loss_value = iou_loss(target, output.sigmoid())
-mse_loss_value = criterion_mse(output.sigmoid(), target)
-contour_loss_value = contour_loss(output.sigmoid(), target)
+l1_loss_value = l1_loss(target, output.sigmoid())
+
+# mse_loss_value = criterion_mse(output.sigmoid(), target)
+# contour_loss_value = contour_loss(output.sigmoid(), target)
 
 
 print(f'IoU loss:{iou_loss_value}')
-print(f'L1-loss:{mse_loss_value}')
+print(f'L1-loss:{l1_loss_value}')
 print(f'IoU loss shape:{iou_loss_value.shape}')
-print(f'L1-loss shape:{mse_loss_value.shape}')
+print(f'L1-loss shape:{l1_loss_value.shape}')
 
 # plt.imshow(target[0,0], cmap='gray')
 # plt.show()
 
+start_train = time.time()
 #Train the model
 pretrain_model(model = generator_model,
-               train_loader = NORM_TRAIN_LOADER,
-               val_loader = NORM_VALID_LOADER,
+               train_loader = TRAIN_LOADER,
+               val_loader = VALID_LOADER,
                num_epochs = EPOCHS,
                lr = LEARNING_RATE,
                device = DEVICE,
                start_epoch = 0,
                checkpoint_dir = CHECKPOINT_DIR,
-               resume=True)
+               resume=False)
+end_train = time.time()
+total_time = end_train - start_train
+hours, rem = divmod(total_time, 3600)
+minutes, seconds = divmod(rem, 60)
+print(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
+logging.info(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
