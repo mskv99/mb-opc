@@ -1,7 +1,7 @@
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
-from src.config import DATASET_PATH
+from config import DATASET_PATH
 from tqdm import tqdm
 import numpy as np
 import torch

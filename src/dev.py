@@ -7,7 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from models.model import Generator
-from data.dataset import OPCDataset, TestDataset, BinarizeTransform
+from dataset import OPCDataset, TestDataset, BinarizeTransform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE
 from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss
 

@@ -116,6 +116,22 @@ def get_next_experiment_folder(checkpoints_dir):
       return exp_folder
     exp_number += 1
 
+def next_exp_folder(checkpoints_dir):
+  if not os.path.exists(checkpoints_dir):
+    os.makedirs(checkpoints_dir)
+  dir_list = os.listdir(checkpoints_dir)
+  give_numb = lambda x: int(x.split('_')[-1])
+  dir_numbers = [give_numb(name) for name in dir_list if not name.endswith('.gitkeep')]
+  max_number = max(dir_numbers)
+  new_exp_folder = os.path.join(checkpoints_dir, f'exp_{max_number + 1}')
+  os.makedirs(new_exp_folder)
+  return new_exp_folder
+
+if __name__ == '__main__':
+  new_folder = next_exp_folder('/mnt/data/amoskovtsev/mb_opc/checkpoints')
+  print(f'New checkpoint folder:{new_folder}')
+
+
 '''
 for images, targets in dataloader:
   preds = model(images)
