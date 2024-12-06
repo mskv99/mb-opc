@@ -13,6 +13,16 @@ from utils import next_exp_folder
 from config import CHECKPOINT_PATH
 from torch.utils.data import DataLoader
 
+# fixing seeds during inference
+def set_random_seed(seed):
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+  np.random.seed(seed)
+  random.seed(seed)
+
+set_random_seed(42)
 
 parser = argparse.ArgumentParser(description = 'Performing inference on topology images')
 parser.add_argument('inference_folder', type = str, help = 'Relative path to an inference image folder')
@@ -20,7 +30,7 @@ parser.add_argument('--batch_size', type = int, default = 2, help = 'Batch size 
 args = parser.parse_args()
 
 DATA_PATH = args.inference_folder # 'data/processed/gds_dataset/origin/test_origin'
-MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_3/last_checkpoint.pth') #'/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth'
+MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_10/last_checkpoint.pth') #'/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth'
 OUTPUT_DIR = next_exp_folder('inference/output_img')
 BATCH_SIZE = args.batch_size
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -33,7 +43,7 @@ def save_image(output_batch, checkpoint_dir="checkpoints", image_type='true_corr
         single_image[single_image <= 0.5] = 0.0
 
         single_image_path = image_type[i].split('/')[-1][:-4]
-        img_save_path = os.path.join(checkpoint_dir, f"{single_image_path}.png")
+        img_save_path = os.path.join(checkpoint_dir, f"{single_image_path}.jpg")
         cv2.imwrite(f"{img_save_path}", (single_image*255).detach().cpu().numpy())
         print(f"Saved generated image at {img_save_path}")
 
