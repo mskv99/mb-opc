@@ -46,20 +46,19 @@ def calculate_iou(eval_loader):
   iou_list = []
 
   for target_batch, mask_batch in eval_loader:
-    intersection = (mask_batch * target_batch).sum(dim=(2, 3))
-    union = (mask_batch + target_batch).sum(dim=(2, 3)) - intersection
+    intersection = (mask_batch * target_batch).sum() #.sum(dim=(2, 3))
+    union = (mask_batch + target_batch).sum() - intersection
     iou = (intersection + 1e-6) / (union + 1e-6)
-    iou_list.append(iou.mean())
-
+    iou_list.append(iou)
   print(f'Average IoU: {sum(iou_list) / len(eval_loader)}')
 
 def calculate_pixel_accuracy(eval_loader):
   pixel_acc_list = []
   for target_batch, mask_batch in eval_loader:
-    intersection = (mask_batch * target_batch).sum(dim=(2, 3))
-    pixel_acc = (intersection + 1e-6) / (target_batch.sum(dim=(2,3)) + 1e-6)
-    pixel_acc_list.append(pixel_acc.mean())
-
+    correct = (target_batch == mask_batch).float().sum()
+    total = torch.numel(target_batch)
+    pixel_acc = correct / total
+    pixel_acc_list.append(pixel_acc)
   print(f'Average Pixel Accuracy: {sum(pixel_acc_list) / len(eval_loader)}')
 
 TRANSFORM = transforms.Compose([
