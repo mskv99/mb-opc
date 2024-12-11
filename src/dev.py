@@ -3,13 +3,15 @@ import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import os
+import numpy as np
+import random
 import matplotlib
 import matplotlib.pyplot as plt
 
 from models.model import Generator
 from dataset import OPCDataset, TestDataset, BinarizeTransform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE
-from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss
+from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss, PixelAccuracy
 
 matplotlib.use('Agg')
 
@@ -24,6 +26,15 @@ generator_model = generator_model.to(DEVICE)
 generator_model.eval()
 print('Model initialized:', generator_model)
 
+def set_random_seed(seed):
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+  np.random.seed(seed)
+  random.seed(seed)
+
+set_random_seed(42)
 
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
   '''
@@ -42,7 +53,7 @@ def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", imag
   cv2.imwrite(f"{img_save_path}", (single_image * 255).detach().cpu().numpy())
   print(f"Saved generated image at {img_save_path}")
 
-TRANSFORM = transform = transforms.Compose([
+TRANSFORM = transforms.Compose([
     transforms.Resize((1024, 1024)),
     transforms.ToTensor(),
     transforms.Grayscale(),
@@ -51,15 +62,16 @@ TRANSFORM = transform = transforms.Compose([
 
 TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'),
                           os.path.join(DATASET_PATH, 'correction/test_correction'),
-                          transform = transform)
+                          transform = TRANSFORM)
 
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = True)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False)
 
 # define loss functions
 tv_loss = TVLoss(weight=1.0)
 contour_loss = ContourLoss(weight=1.0, device=DEVICE)
 mse_loss = torch.nn.MSELoss()
 iou_loss = IouLoss(weight=1.0)
+pixel_acc = PixelAccuracy()
 
 image, target = next(iter(TEST_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
@@ -83,6 +95,10 @@ print(f'iou_loss:{iou_loss_iter}')
 print(f'tv loss pred:{tv_loss_pred}')
 print(total_loss)
 
+pixel_acc = PixelAccuracy()
+accuracy = pixel_acc(pred, target)
+print(f'Pixel Accuracy: {accuracy}')
+
 # # 1. Find the maximum values across the last two dimensions
 # max_across_width, _ = image.max(dim=(-1))
 # max_values, _ = max_across_width.max(dim=-1)
@@ -97,7 +113,7 @@ print(total_loss)
 # print("Unique values across last two dimensions:")
 # print(unique_values)
 # print("Number of unique values:", unique_values.numel())
-#
+
 # # Выполним проверку подсчёта функций потерь
 # with torch.no_grad():
 #   output = generator_model(image)
