@@ -152,7 +152,7 @@ def pretrain_model(model, train_loader,
   else:
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay = 1e-5)
     # scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=5, gamma=0.5)
-    scheduler = lr_sched.CosineAnnealingLR(optimizer=optimizer, T_max=25, eta_min=1e-6)
+    scheduler = lr_sched.CosineAnnealingLR(optimizer=optimizer, T_max=50, eta_min=1e-7)
     print('Starting experiment...')
     logging.info('Starting experiment...')
   total_loss_epoch_list_train = []
@@ -164,7 +164,8 @@ def pretrain_model(model, train_loader,
 
   iou_epoch_list_train = []
   iou_epoch_list_val = []
-
+  model.to(device)
+  torch.autograd.set_detect_anomaly(True)
   for epoch in range(start_epoch, num_epochs):
     # l2_loss_epoch = 0
     l1_loss_epoch = 0
@@ -175,7 +176,6 @@ def pretrain_model(model, train_loader,
 
     print(f"[Epoch {epoch}] Training")
     logging.info(f"[Epoch {epoch}] Training")
-    model.to(device)
     model.train()
 
     progress = tqdm(train_loader)
@@ -328,7 +328,7 @@ logging.info(f'Batch size:{BATCH_SIZE}')
 # Define dataset
 TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(binarize_flag = True))
 VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(binarize_flag = True))
-TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform(binariza_falg = True))
+TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform(binarize_flag = True))
 
 # Define dataloader
 TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)

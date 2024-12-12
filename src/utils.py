@@ -126,10 +126,10 @@ class PixelAccuracy(nn.Module):
     self.eps = eps
 
   def forward(self, pred, target):
+    pred = pred.clone()
     pred[pred > 0.5] = 1.0
     pred[pred <= 0.5] = 0.0
     correct = (pred == target).float().sum()
-    print(f'Correct shape:{correct.shape}')
     total = torch.numel(target)
     pixel_acc = (correct + self.eps) / (total + self.eps)
 
