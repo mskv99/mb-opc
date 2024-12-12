@@ -13,7 +13,7 @@ import time
 import os
 
 from models.model import Generator
-from utils import ContourLoss, IouLoss, get_next_experiment_folder, next_exp_folder
+from utils import ContourLoss, IouLoss, get_next_experiment_folder, next_exp_folder, IoU, PixelAccuracy, draw_plot
 from dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
@@ -49,9 +49,10 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
   model.eval()
   l1_loss_epoch = 0
   iou_loss_epoch = 0
-  contour_loss_epoch = 0
   total_loss_epoch = 0
-  # criterion_mse = nn.MSELoss()
+  pixel_acc_epoch = 0
+  iou_epoch = 0
+
   print(f"[Epoch {current_epoch}] Validating")
   logging.info(f"[Epoch {current_epoch}] Validating")
 
@@ -61,27 +62,36 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
 
       params = model(image)
       mask = torch.sigmoid(params)
+      # calculating loss during validation phase
       l1_loss_iter = l1_loss(mask, target)
       # l2_loss_iter = criterion_mse(mask, target) # nn.MSELoss(mask, target)
       iou_loss_iter = iou_loss(mask, target)
       total_loss_iter = l1_loss_iter + iou_loss_iter
+
+      # calculating metrics during validation phase
+      pixel_acc_iter = pixel_accuracy(mask, target)
+      iou_iter = iou(mask, target)
 
       if idx % 10 == 0:
         log_info_iter = {
           'epoch': current_epoch,
           'num_epochs': num_epochs,
           'step': idx,
-          'len_train_loader': len(val_loader),
+          'len_valid_loader': len(val_loader),
           'l1_loss': l1_loss_iter.item(),
           'iou_loss': iou_loss_iter.item(),
           'total_loss': total_loss_iter.item(),
+          'pixel_acc': pixel_acc_iter.item(),
+          'iou': iou_iter.item()
         }
 
         log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
-                       f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
+                       f"Step [{log_info_iter['step']}/{log_info_iter['len_valid_loader']}], "
                        f"L1 Loss: {log_info_iter['l1_loss']:.4f}, "
                        f"IoU Loss: {log_info_iter['iou_loss']:.4f}, "
-                       f"Total Loss: {log_info_iter['total_loss']:.4f}")
+                       f"Total Loss: {log_info_iter['total_loss']:.4f}, "
+                       f"Pixel Accuracy: {log_info_iter['pixel_acc']:.4f}, "
+                       f"IoU: {log_info_iter['iou']:.4f}")
 
         # Print and log the message
         print(log_message_iter)
@@ -94,27 +104,33 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
       l1_loss_epoch += l1_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
+      pixel_acc_epoch += pixel_acc_iter.item()
+      iou_epoch += iou_iter.item()
 
     log_info_epoch = {
       'epoch': current_epoch,
       'num_epochs': num_epochs,
-      'len_train_loader': len(val_loader),
+      'len_valid_loader': len(val_loader),
       'l1_loss': l1_loss_epoch,
       'iou_loss': iou_loss_epoch,
       'total_loss': total_loss_epoch,
+      'pixel_acc': pixel_acc_epoch,
+      'iou': iou_epoch
     }
 
     log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
-                        f"L1 Loss: {log_info_epoch['l1_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
-                        f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
-                        f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}")
+                        f"L1 Loss: {log_info_epoch['l1_loss'] / log_info_epoch['len_valid_loader'] :.4f}, "
+                        f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_valid_loader'] :.4f}, "
+                        f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_valid_loader'] :.4f}, "
+                        f"Pixel Accuracy: {log_info_epoch['pixel_acc'] / log_info_epoch['len_valid_loader'] :.4f}, "
+                        f"IoU: {log_info_epoch['iou'] / log_info_epoch['len_valid_loader'] :.4f}")
 
     # Print and log the message
     print(log_message_epoch)
     logging.info(log_message_epoch)
 
-
-  return total_loss_epoch / len(val_loader)
+  # return average total loss, average pixel accuracy and average iou per epoch
+  return log_info_epoch['total_loss'] / log_info_epoch['len_valid_loader'], log_info_epoch['pixel_acc'] / log_info_epoch['len_valid_loader'], log_info_epoch['iou'] / log_info_epoch['len_valid_loader']
 
 def pretrain_model(model, train_loader,
                    val_loader, num_epochs,
@@ -136,22 +152,30 @@ def pretrain_model(model, train_loader,
   else:
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay = 1e-5)
     # scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=5, gamma=0.5)
-    scheduler = lr_sched.CosineAnnealingLR(optimizer=optimizer, T_max=25, eta_min=1e-6)
+    scheduler = lr_sched.CosineAnnealingLR(optimizer=optimizer, T_max=50, eta_min=1e-7)
     print('Starting experiment...')
     logging.info('Starting experiment...')
   total_loss_epoch_list_train = []
   total_loss_epoch_list_val = []
   total_loss_iter_list = []
 
+  pixel_acc_epoch_list_train = []
+  pixel_acc_epoch_list_val = []
+
+  iou_epoch_list_train = []
+  iou_epoch_list_val = []
+  model.to(device)
+  torch.autograd.set_detect_anomaly(True)
   for epoch in range(start_epoch, num_epochs):
     # l2_loss_epoch = 0
     l1_loss_epoch = 0
     iou_loss_epoch = 0
     total_loss_epoch = 0
+    pixel_acc_epoch = 0
+    iou_epoch = 0
 
     print(f"[Epoch {epoch}] Training")
     logging.info(f"[Epoch {epoch}] Training")
-    model.to(device)
     model.train()
 
     progress = tqdm(train_loader)
@@ -161,11 +185,15 @@ def pretrain_model(model, train_loader,
       params = model(image)
       mask = torch.sigmoid(params)
 
-      # l2_loss_iter = criterion_mse(mask, target)
+      # calculate losses during train phase
       l1_loss_iter = l1_loss(mask, target)
       iou_loss_iter = iou_loss(mask, target)
       total_loss_iter = l1_loss_iter + iou_loss_iter
       total_loss_iter_list.append(total_loss_iter.item())
+
+      # calculate metrics during train phase
+      pixel_acc_iter = pixel_accuracy(mask, target)
+      iou_iter = iou(mask, target)
 
       optimizer.zero_grad()
       total_loss_iter.backward()
@@ -181,32 +209,36 @@ def pretrain_model(model, train_loader,
           'l1_loss': l1_loss_iter.item(),
           'iou_loss': iou_loss_iter.item(),
           'total_loss': total_loss_iter.item(),
+          'pixel_acc': pixel_acc_iter.item(),
+          'iou': iou_iter.item()
         }
 
         log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
                        f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
                        f"L1 Loss: {log_info_iter['l1_loss']:.4f}, "
                        f"IoU Loss: {log_info_iter['iou_loss']:.4f}, "
-                       f"Total Loss: {log_info_iter['total_loss']:.4f}")
+                       f"Total Loss: {log_info_iter['total_loss']:.4f}, "
+                       f"Pixel Accuracy: {log_info_iter['pixel_acc']:.4f}, "
+                       f"IoU: {log_info_iter['iou']:.4f} ")
 
         print(log_message_iter)
         logging.info(log_message_iter)
-
-        plt.figure(figsize=(8, 6))
-        plt.plot(total_loss_iter_list, linestyle='-', label='train_iter_loss')
-        plt.title('Iteration loss')
-        plt.xlabel('iteration')
-        plt.ylabel('loss')
-        plt.legend()
-        plt.savefig(os.path.join(checkpoint_dir, 'iter_loss_train.jpg'))
-        plt.close()
+        # draw loss plot per iteration
+        draw_plot(first_variable = total_loss_iter_list, label = 'train_iter_loss',
+                  title = 'Iteration loss plot', xlabel = 'Iteration',
+                  ylabel = 'Loss', save_name = 'train_iter_loss.jpg',
+                  checkpoint_dir = checkpoint_dir)
 
       if idx % 200 == 0:
+        # save generated mask
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
 
       l1_loss_epoch += l1_loss_iter.item()
       iou_loss_epoch += iou_loss_iter.item()
       total_loss_epoch += total_loss_iter.item()
+
+      pixel_acc_epoch += pixel_acc_iter.item()
+      iou_epoch += iou_iter.item()
 
       if idx % 500 == 0:
         checkpoint_path = os.path.join(checkpoint_dir, 'last_checkpoint.pth')
@@ -226,30 +258,50 @@ def pretrain_model(model, train_loader,
       'l1_loss': l1_loss_epoch,
       'iou_loss': iou_loss_epoch,
       'total_loss': total_loss_epoch,
+      'pixel_acc': pixel_acc_epoch,
+      'iou': iou_epoch
     }
 
     log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
                         f"L1 Loss: {log_info_epoch['l1_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
                         f"IoU Loss: {log_info_epoch['iou_loss'] / log_info_epoch['len_train_loader'] :.4f}, "
-                        f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}")
+                        f"Total Loss: {log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'] :.4f}"
+                        f"Pixel Accuracy: {log_info_epoch['pixel_acc'] / log_info_epoch['len_train_loader'] :.4f}"
+                        f"IoU: {log_info_epoch['iou'] / log_info_epoch['len_train_loader'] :.4f}")
 
     print(log_message_epoch)
     logging.info(log_message_epoch)
 
-    total_loss_epoch_list_train.append(total_loss_epoch / len(train_loader))
-    total_loss_epoch_val = validate_model(model, val_loader, current_epoch = epoch, num_epochs=num_epochs, checkpoint_dir = checkpoint_dir, device = device)
-    total_loss_epoch_list_val.append(total_loss_epoch_val)
+    # get average loss, pixel accuracy and iou per epoch during training phase
+    total_loss_epoch_list_train.append(log_info_epoch['total_loss'] / log_info_epoch['len_train_loader'])
+    pixel_acc_epoch_list_train.append(log_info_epoch['pixel_acc'] / log_info_epoch['len_train_loader'])
+    iou_epoch_list_train.append(log_info_epoch['iou'] / log_info_epoch['len_train_loader'])
 
-    plt.figure(figsize=(8, 6))
-    plt.plot(total_loss_epoch_list_train, linestyle='-', label='train_loss')
-    plt.plot(total_loss_epoch_list_val, linestyle='-', color='b', label='valid_loss')
-    plt.title('Epoch loss')
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.grid()
-    plt.legend()
-    plt.savefig(os.path.join(checkpoint_dir, 'epoch_loss.jpg'))
-    plt.close()
+    # get average loss, pixel accuracy and iou per epoch during validation phase
+    total_loss_epoch_val, pixel_acc_epoch_val, iou_epoch_val = validate_model(model, val_loader, current_epoch = epoch,
+                                                                              num_epochs = num_epochs, checkpoint_dir = checkpoint_dir,
+                                                                              device = device)
+    total_loss_epoch_list_val.append(total_loss_epoch_val)
+    iou_epoch_list_val.append(iou_epoch_val)
+    pixel_acc_epoch_list_val.append(pixel_acc_epoch_val)
+
+    # draw epoch losses for training and validation phases
+    draw_plot(first_variable = total_loss_epoch_list_train, second_variable = total_loss_epoch_list_val,
+              title='Loss plot', xlabel='epoch',
+              ylabel='loss', first_label='train_loss', second_label='valid_loss',
+              save_name='epoch_loss.jpg', checkpoint_dir = checkpoint_dir)
+
+    # draw epoch IoU for training and validation phases
+    draw_plot(first_variable = iou_epoch_list_train, second_variable = iou_epoch_list_train,
+              title = 'IoU plot', xlabel = 'epoch',
+              ylabel = 'iou', first_label = 'train_iou', second_label = 'valid_iou',
+              save_name = 'epoch_iou.jpg', checkpoint_dir = checkpoint_dir)
+
+    # draw epoch Pixel Accuracy for training and validation phases
+    draw_plot(first_variable = pixel_acc_epoch_list_train, second_variable = pixel_acc_epoch_list_val,
+              title = 'Pixel Accuracy plot', xlabel = 'epoch',
+              ylabel = 'pixel accuracy', first_label = 'train_pixel_acc', second_label = 'valid_pixel_acc',
+              save_name = 'epoch_pixel_acc.jpg', checkpoint_dir = checkpoint_dir)
 
     scheduler.step()
 
@@ -274,9 +326,9 @@ print(f'Output shape: {torch.sigmoid(output).shape}')
 
 logging.info(f'Batch size:{BATCH_SIZE}')
 # Define dataset
-TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform())
-VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform())
-TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform())
+TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(binarize_flag = True))
+VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(binarize_flag = True))
+TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform(binarize_flag = True))
 
 # Define dataloader
 TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
@@ -291,17 +343,6 @@ logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}')
 logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}')
 logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
-# Normalizing the data
-#print(f'Calculating mean and standard deviation for a dataset')
-#logging.info(f'Calculating mean and standard deviation for a dataset')
-#train_mean, train_std = calculate_mean_std(TRAIN_LOADER)
-#print(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
-#logging.info(f'Train Dataset Mean:{train_mean}, Std:{train_std}\n')
-# Create a normalized version of dataset and dataloader
-#NORM_TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(mean = train_mean , std = train_std))
-#NORM_VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(mean = train_mean, std = train_std))
-#NORM_TRAIN_LOADER = DataLoader(NORM_TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
-#NORM_VALID_LOADER = DataLoader(NORM_VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
 
 image, target = next(iter(TRAIN_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
@@ -317,6 +358,8 @@ print(f'Output shape: {output.shape}')
 iou_loss = IouLoss(weight=1.0)
 # criterion_mse = torch.nn.MSELoss()
 l1_loss = torch.nn.L1Loss()
+pixel_accuracy = PixelAccuracy()
+iou = IoU()
 
 iou_loss_value = iou_loss(target, output.sigmoid())
 l1_loss_value = l1_loss(target, output.sigmoid())
