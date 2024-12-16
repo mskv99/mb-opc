@@ -292,7 +292,7 @@ def pretrain_model(model, train_loader,
               save_name='epoch_loss.jpg', checkpoint_dir = checkpoint_dir)
 
     # draw epoch IoU for training and validation phases
-    draw_plot(first_variable = iou_epoch_list_train, second_variable = iou_epoch_list_train,
+    draw_plot(first_variable = iou_epoch_list_train, second_variable = iou_epoch_list_val,
               title = 'IoU plot', xlabel = 'epoch',
               ylabel = 'iou', first_label = 'train_iou', second_label = 'valid_iou',
               save_name = 'epoch_iou.jpg', checkpoint_dir = checkpoint_dir)
