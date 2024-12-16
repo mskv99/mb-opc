@@ -8,7 +8,7 @@ import random
 import matplotlib
 import matplotlib.pyplot as plt
 
-from models.model import Generator
+from models.unet import Generator
 from dataset import OPCDataset, TestDataset, BinarizeTransform
 from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE
 from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss, PixelAccuracy

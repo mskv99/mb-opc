@@ -1,18 +1,20 @@
 import cv2
+import sys
 import torch
 import argparse
 import numpy as np
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
 import random
 import time
 import os
 
-from models.model import *
-import torchvision.transforms as transforms
-from models.model import Generator
-from dataset import OPCDataset, TestDataset, BinarizeTransform
-from utils import next_exp_folder
-from config import CHECKPOINT_PATH
-from torch.utils.data import DataLoader
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+from src.models.unet import Generator
+from src.dataset import TestDataset, BinarizeTransform
+from src.utils import next_exp_folder
+from src.config import CHECKPOINT_PATH
 
 # fixing seeds during inference
 def set_random_seed(seed):

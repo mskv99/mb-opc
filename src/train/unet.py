@@ -10,12 +10,15 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import logging
 import time
+import sys
 import os
 
-from models.model import Generator
-from utils import ContourLoss, IouLoss, get_next_experiment_folder, next_exp_folder, IoU, PixelAccuracy, draw_plot
-from dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
-from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+from src.models.unet import Generator
+from src.utils import ContourLoss, IouLoss, get_next_experiment_folder, next_exp_folder, IoU, PixelAccuracy, draw_plot
+from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
+from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
 def set_random_seed(seed):
   torch.manual_seed(seed)

@@ -1,7 +1,6 @@
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
-from config import DATASET_PATH
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
@@ -128,6 +127,7 @@ def apply_transform(binarize_flag = False, normalize_flag = False, mean=0, std=0
 
 
 if __name__ == '__main__':
+    from config import DATASET_PATH
 
     TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'),
                                os.path.join(DATASET_PATH, 'correction/train_correction'), transform = apply_transform())
