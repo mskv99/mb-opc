@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy.ndimage import distance_transform_edt
 from torchvision import models
+import matplotlib.pyplot as plt
 import os
 
 def compute_distance_map(mask):
@@ -14,6 +15,7 @@ def compute_distance_map(mask):
   '''
   mask = mask.cpu().numpy()
   distance_map = distance_transform_edt(mask) + distance_transform_edt(1 - mask)
+
   return torch.tensor(distance_map).float()
 
 class BoundaryLoss(nn.Module):
@@ -26,6 +28,7 @@ class BoundaryLoss(nn.Module):
     dist_maps = torch.stack([compute_distance_map(t) for t in target]).to(self.device)
     # Compute boundary loss
     boundary_loss = torch.mean(pred * dist_maps)
+
     return torch.from_numpy(self.weight * boundary_loss)
 
 class ContourLoss(nn.Module):
@@ -60,6 +63,7 @@ class TVLoss(nn.Module):
     self.weight = weight
   def forward(self, x):
     tv_loss = torch.sum(torch.abs(x[:,:,1:,:] - x[:, :, :-1, :])) + torch.sum(torch.abs(x[:,:,:,1:] - x[:, :, :, :-1]))
+
     return self.weight * tv_loss
 
 class PerceptualLoss(nn.Module):
@@ -81,6 +85,7 @@ class PerceptualLoss(nn.Module):
     for layer in self.features:
       pred, target = layer(pred), layer(target)
       perceptual_loss += F.l1_loss(pred, target)
+
     return self.weight * perceptual_loss
 
   @staticmethod
@@ -89,6 +94,7 @@ class PerceptualLoss(nn.Module):
     mean = torch.tensor([0.485, 0.456, 0.406]).to(x.device)
     std = torch.tensor([0.229, 0.224, 0.225]).to(x.device)
     x = (x - mean[None, :, None, None]) / std[None, :, None, None]
+
     return x
 
 class IouLoss(nn.Module):
@@ -101,6 +107,34 @@ class IouLoss(nn.Module):
     union = (pred + target).sum(dim=(2, 3)) - intersection
     iou = (intersection + self.eps) / (union + self.eps)
     return (1 - iou.mean()) * self.weight
+
+class IoU(nn.Module):
+  def __init__(self, eps=1e-6):
+    super(IoU, self).__init__()
+    self.eps = eps
+
+  def forward(self, pred, target):
+    intersection = (pred * target).sum(dim=(2, 3))
+    union = (pred + target).sum(dim=(2, 3)) - intersection
+    iou = (intersection + self.eps) / (union + self.eps)
+
+    return iou.mean()
+
+class PixelAccuracy(nn.Module):
+  def __init__(self, eps=1e-6):
+    super(PixelAccuracy, self).__init__()
+    self.eps = eps
+
+  def forward(self, pred, target):
+    pred = pred.clone()
+    pred[pred > 0.5] = 1.0
+    pred[pred <= 0.5] = 0.0
+    correct = (pred == target).float().sum()
+    total = torch.numel(target)
+    pixel_acc = (correct + self.eps) / (total + self.eps)
+
+    return pixel_acc
+
 
 def get_next_experiment_folder(checkpoints_dir):
   # Ensure the checkpoints directory exists
@@ -127,10 +161,45 @@ def next_exp_folder(checkpoints_dir):
   os.makedirs(new_exp_folder)
   return new_exp_folder
 
-if __name__ == '__main__':
-  new_folder = next_exp_folder('/mnt/data/amoskovtsev/mb_opc/checkpoints')
-  print(f'New checkpoint folder:{new_folder}')
+def draw_plot(**kwargs):
+  # plotting single variable on a plot
 
+  if len(kwargs) == 7:
+    plt.figure(figsize=(8, 6))
+    plt.plot(kwargs['first_variable'], linestyle='-', label= kwargs['label'])
+    plt.title(kwargs['title'])
+    plt.xlabel(kwargs['xlabel'])
+    plt.ylabel(kwargs['ylabel'])
+    plt.grid()
+    plt.legend()
+    plt.savefig(os.path.join(kwargs['checkpoint_dir'], kwargs['save_name']))
+    plt.close()
+
+  # plotting two variables on a plot
+  elif len(kwargs) == 9:
+    plt.figure(figsize=(8, 6))
+    plt.plot(kwargs['first_variable'], linestyle='-', color='r', label= kwargs['first_label'])
+    plt.plot(kwargs['second_variable'], linestyle='-', color='b',label = kwargs['second_label'])
+    plt.title(kwargs['title'])
+    plt.xlabel(kwargs['xlabel'])
+    plt.ylabel(kwargs['ylabel'])
+    plt.grid()
+    plt.legend()
+    plt.savefig(os.path.join(kwargs['checkpoint_dir'], kwargs['save_name']))
+    plt.close()
+
+if __name__ == '__main__':
+  a = [1, 2, 3, 4, 5, 20, 30, 50, 90, 100]
+  b = [0, 2, 3, 4, 10, 11, 12, 80, 110, 120]
+
+  draw_plot(first_variable = a, label = 'loss',
+            title = 'Loss plot', xlabel = 'loss value',
+            ylabel = 'iteration', save_name = 'test_graph.jpg',
+            checkpoint_dir = 'data/external')
+  draw_plot(first_variable=a, second_variable=b,
+            title='Loss plot', xlabel='loss value',
+            ylabel='iteration',first_label='iou_train', second_label='iou_val',
+            save_name='iou_graph.jpg', checkpoint_dir='data/external')
 
 '''
 for images, targets in dataloader:
