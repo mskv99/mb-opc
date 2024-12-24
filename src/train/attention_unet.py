@@ -6,8 +6,6 @@ import torch.optim as optim
 from tqdm import tqdm
 import torch.optim.lr_scheduler as lr_sched
 from torch.utils.data import DataLoader
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
 import logging
 import time
 import sys
@@ -15,6 +13,7 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+from src.evaluate import evaluate_model
 from src.models.attention_unet import AttentionUNetGenerator
 from src.utils import ContourLoss, IouLoss, next_exp_folder, IoU, PixelAccuracy, draw_plot
 from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
@@ -345,7 +344,6 @@ logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}')
 logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}')
 logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
-
 image, target = next(iter(TRAIN_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
@@ -365,10 +363,6 @@ iou = IoU()
 
 iou_loss_value = iou_loss(target, output.sigmoid())
 l1_loss_value = l1_loss(target, output.sigmoid())
-
-# mse_loss_value = criterion_mse(output.sigmoid(), target)
-# contour_loss_value = contour_loss(output.sigmoid(), target)
-
 
 print(f'IoU loss:{iou_loss_value}')
 print(f'L1-loss:{l1_loss_value}')
@@ -395,3 +389,16 @@ hours, rem = divmod(total_time, 3600)
 minutes, seconds = divmod(rem, 60)
 print(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
 logging.info(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
+
+print(f'Evaluating model on validation set..:')
+logging.info(f'Evaluating model on validation set..:')
+evaluate_model(model = generator_model,
+               loader = VALID_LOADER,
+               device = DEVICE,
+               log = True)
+print(f'Evaluating model on test set..:')
+logging.info(f'Evaluating model on test set..:')
+evaluate_model(model = generator_model,
+               loader = TEST_LOADER,
+               device = DEVICE,
+               log = True)
