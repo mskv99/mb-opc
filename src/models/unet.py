@@ -1,5 +1,7 @@
 import torch.nn as nn
+import torch
 import torch.nn.functional as F
+from torchinfo import summary
 
 class conv_block(nn.Module):
     """
@@ -97,3 +99,17 @@ class Generator(nn.Module):
 
         output = self.conv_tail(x0_1)
         return output
+if __name__ == '__main__':
+  # Define input tensor
+  input_tensor = torch.randn(1, 1, 1024, 1024)  # Batch size = 1, single channel
+
+  # Initialize the model
+  model = Generator()
+
+  # Forward pass
+  output = model(input_tensor)
+
+  # Check output shape
+  print(f"Output shape: {output.shape}")  # Should be torch.Size([1, 1, 1024, 1024])
+  print(f'Model: {model}')
+  print(summary(model, (1,1,1024,1024)))
