@@ -33,3 +33,6 @@ dist/
 
 # Не хотим игнорирова requirements.txt
 !requirements.txt
+
+# Игнорируем отслеживание конфига
+src/config.py
