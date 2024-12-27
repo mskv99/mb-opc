@@ -9,5 +9,5 @@ else:
   CHECKPOINT_PATH = 'checkpoints'
 
 BATCH_SIZE = 3
-EPOCHS = 50
+EPOCHS = 25
 LEARNING_RATE = 2e-4
