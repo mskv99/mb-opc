@@ -1,17 +1,16 @@
 import torch
 import random
-from PIL import Image
 import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
 import logging
 from tqdm import tqdm
 import numpy as np
 import os
 
-from src.dataset import OPCDataset, TestDataset, BinarizeTransform, apply_transform
-from torch.utils.data import DataLoader, Dataset
-from src.config import DATASET_PATH, CHECKPOINT_PATH
-from src.models.unet import Generator
-from src.utils import IoU, PixelAccuracy
+from dataset import OPCDataset, BinarizeTransform, apply_transform
+from config import DATASET_PATH, CHECKPOINT_PATH
+from models.unet import Generator
+from utils import IoU, PixelAccuracy
 
 # fixing seeds during evaluation
 def set_random_seed(seed):
@@ -84,7 +83,6 @@ def evaluate_model(model, loader, device='cuda', log=False):
     logging.info(f"IoU: {log_info['iou'] / log_info['len_loader'] :.4f}")
 
 
-
   return log_info['pixel_acc'] / log_info['len_loader'], log_info['iou'] / log_info['len_loader']
 
 if __name__ == '__main__':
@@ -109,4 +107,4 @@ if __name__ == '__main__':
   # just in case we want to store the output in txt file and
   # test the function implementation
   logging.basicConfig(filename = 'log.txt',datefmt = '%d/%m/%Y %H:%M')
-  evaluate_model(model = generator_model, loader=TEST_LOADER, device=DEVICE, log=False)
+  evaluate_model(model = generator_model, loader = TEST_LOADER, device = DEVICE, log = False)

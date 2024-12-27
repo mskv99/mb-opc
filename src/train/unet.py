@@ -13,7 +13,6 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.evaluate import evaluate_model
 from src.models.unet import Generator
 from src.utils import ContourLoss, IouLoss, next_exp_folder, IoU, PixelAccuracy, draw_plot
 from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
@@ -132,6 +131,40 @@ def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,
 
   # return average total loss, average pixel accuracy and average iou per epoch
   return log_info_epoch['total_loss'] / log_info_epoch['len_valid_loader'], log_info_epoch['pixel_acc'] / log_info_epoch['len_valid_loader'], log_info_epoch['iou'] / log_info_epoch['len_valid_loader']
+
+def evaluate_model(model, loader, device='cuda', log=False):
+  model.eval()
+
+  pixel_acc_epoch = 0
+  iou_epoch = 0
+
+  with torch.no_grad():
+    for idx, (image, target) in tqdm(enumerate(loader)):
+      image, target = image.to(device), target.to(device)
+      params = model(image)
+      mask = torch.sigmoid(params)
+
+      # calculating metrics for evaluation
+      pixel_acc_iter = pixel_accuracy(mask, target)
+      iou_iter = iou(mask, target)
+
+      pixel_acc_epoch += pixel_acc_iter.item()
+      iou_epoch += iou_iter.item()
+
+    log_info = {
+      'pixel_acc': pixel_acc_epoch,
+      'iou': iou_epoch,
+      'len_loader': len(loader)
+    }
+
+    # Print and log the message
+  print(f"Pixel Accuracy: {log_info['pixel_acc'] / log_info['len_loader'] :.4f}, ")
+  print(f"IoU: {log_info['iou'] / log_info['len_loader'] :.4f}")
+
+  if log:
+    logging.info(f"Pixel Accuracy: {log_info['pixel_acc'] / log_info['len_loader'] :.4f}, ")
+    logging.info(f"IoU: {log_info['iou'] / log_info['len_loader'] :.4f}")
+
 
 def pretrain_model(model, train_loader,
                    val_loader, num_epochs,
