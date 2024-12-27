@@ -7,11 +7,11 @@ from tqdm import tqdm
 import numpy as np
 import os
 
-from dataset import OPCDataset, TestDataset, BinarizeTransform, apply_transform
+from src.dataset import OPCDataset, TestDataset, BinarizeTransform, apply_transform
 from torch.utils.data import DataLoader, Dataset
-from config import DATASET_PATH, CHECKPOINT_PATH
-from models.unet import Generator
-from utils import IoU, PixelAccuracy
+from src.config import DATASET_PATH, CHECKPOINT_PATH
+from src.models.unet import Generator
+from src.utils import IoU, PixelAccuracy
 
 # fixing seeds during evaluation
 def set_random_seed(seed):
