@@ -7,6 +7,7 @@ import torch.optim as optim
 from tqdm import tqdm
 import torch.optim.lr_scheduler as lr_sched
 from torchvision import transforms, datasets
+from torchinfo import summary
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import logging
@@ -17,8 +18,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from src.utils import next_exp_folder, draw_plot
-from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
-from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
+from src.dataset import BinarizeTransform
+from src.config import CLASSIFACTION_DATA_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
 def set_random_seed(seed):
   torch.manual_seed(seed)
@@ -37,36 +38,20 @@ def setup_logging(exp_folder):
                       level = logging.INFO,
                       datefmt = '%d/%m/%Y %H:%M')
 
-
 data_transforms = {
   'train': transforms.Compose([
-    transforms.Resize(512),
+    transforms.Resize(1024),
     transforms.ToTensor(),
     transforms.Grayscale(),
     BinarizeTransform(threshold=0.5)
   ]),
   'val': transforms.Compose([
-    transforms.Resize(512),
+    transforms.Resize(1024),
     transforms.ToTensor(),
     transforms.Grayscale(),
     BinarizeTransform(threshold=0.5)
   ])
 }
-
-DATA_DIR = 'data/processed/classifier/'
-
-TRAIN_DATASET = datasets.ImageFolder(os.path.join(DATA_DIR, 'train'), data_transforms['train'])
-VAL_DATASET = datasets.ImageFolder(os.path.join(DATA_DIR, 'val'), data_transforms['val'])
-TRAIN_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size = 3, shuffle = True, num_workers = 2)
-VAL_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size = 3, shuffle = False, num_workers = 2)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-class_names = TRAIN_DATASET.classes
-dataset_sizes = {'train': len(TRAIN_DATASET), 'val': len(VAL_DATASET)}
-print(f'Dataset size:{dataset_sizes}')
-print(f'Class names:{class_names}')
-
 
 class BinaryClassificationCNN(nn.Module):
   def __init__(self):
@@ -77,21 +62,34 @@ class BinaryClassificationCNN(nn.Module):
     self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1)  # Output: 32 x 256 x 256
     self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)  # Output: 64 x 128 x 128
     self.conv4 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)  # Output: 128 x 64 x 64
+    self.conv5 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1) # Output: 256 x 32 x 32
 
     # Fully connected layers
-    self.fc1 = nn.Linear(128 * 64 * 64, 512)  # Flattened input to 512 nodes
+    self.fc1 = nn.Linear(256 * 4 * 4, 512)  # Flattened input to 512 nodes
     self.fc2 = nn.Linear(512, 1)  # Output layer for binary classification
 
+    # Normalization layers
+    self.bn1 = nn.BatchNorm2d(16)
+    self.bn2 = nn.BatchNorm2d(32)
+    self.bn3 = nn.BatchNorm2d(64)
+    self.bn4 = nn.BatchNorm2d(128)
     # Activation and pooling
     self.relu = nn.ReLU()
     self.dropout = nn.Dropout(0.5)
     self.sigmoid = nn.Sigmoid()
+    self.avgpool = nn.AvgPool2d(kernel_size=2, stride=2)
+    self.global_avgpool = nn.AdaptiveAvgPool2d((4,4))
 
   def forward(self, x):
-    x = self.relu(self.conv1(x))
-    x = self.relu(self.conv2(x))
-    x = self.relu(self.conv3(x))
-    x = self.relu(self.conv4(x))
+    x = self.avgpool(x)
+    x = self.bn1(self.relu(self.conv1(x)))
+    x = self.bn2(self.relu(self.conv2(x)))
+    x = self.bn3(self.relu(self.conv3(x)))
+    x = self.bn4(self.relu(self.conv4(x)))
+    x = self.relu(self.conv5(x))
+
+    # Global average pooling
+    x = self.global_avgpool(x)
 
     # Flatten the tensor
     x = x.view(x.size(0), -1)  # Flatten the output for fully connected layers
@@ -110,6 +108,25 @@ def calculate_accuracy(outputs, labels):
   correct = (predictions == labels).sum().item()
   accuracy = correct / labels.size(0)
   return accuracy
+
+def evaluate(model, loader, loader_type = 'test'):
+
+  accuracy = 0
+  model.eval()
+  with torch.no_grad():
+    for images, labels in loader:
+      images, labels = images.to(device), labels.to(device)
+      labels = labels.view(-1, 1).float()
+
+      outputs = model(images)
+      accuracy += calculate_accuracy(outputs, labels)
+
+  # Average loss and accuracy for the validation set
+  accuracy /= len(loader)
+
+  print(f'Evaluation on {loader_type} loader:')
+  print(f'Accuracy: {accuracy}')
+
 
 def train_model(model, train_loader, val_loader, num_epochs, learning_rate, checkpoint_dir):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -200,36 +217,51 @@ def train_model(model, train_loader, val_loader, num_epochs, learning_rate, chec
 
 if __name__ == '__main__':
 
-  DATA_DIR = 'data/processed/classifier/'
   CHECKPOINT_DIR = next_exp_folder(CHECKPOINT_PATH)
+  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
   setup_logging(CHECKPOINT_DIR)
   logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 
-  TRAIN_DATASET = datasets.ImageFolder(os.path.join(DATA_DIR, 'train'), data_transforms['train'])
-  VAL_DATASET = datasets.ImageFolder(os.path.join(DATA_DIR, 'val'), data_transforms['val'])
-  TRAIN_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=5, shuffle=True, num_workers=2)
-  VAL_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=5, shuffle=False, num_workers=2)
+  TRAIN_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'train'), data_transforms['train'])
+  VAL_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'val'), data_transforms['val'])
+  TEST_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'test'), data_transforms['val'])
+
+  TRAIN_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size = 5, shuffle = True, num_workers = 2)
+  VAL_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size = 5, shuffle = False, num_workers = 2)
+  TEST_LOADER = torch.utils.data.DataLoader(TEST_DATASET, batch_size=1, shuffle=False, num_workers=2)
 
   class_names = TRAIN_DATASET.classes
-  dataset_sizes = {'train': len(TRAIN_DATASET), 'val': len(VAL_DATASET)}
+  dataset_sizes = {'train': len(TRAIN_DATASET), 'val': len(VAL_DATASET), 'test': len(TEST_DATASET)}
   print(f'Dataset size:{dataset_sizes}')
   print(f'Class names:{class_names}')
   logging.info(f'Dataset size:{dataset_sizes}')
   logging.info(f'Class names:{class_names}')
 
   model = BinaryClassificationCNN()
+  image_batch, label_batch = next(iter(VAL_LOADER))
+  print(f'Image shape:{image_batch.shape}')
+  print(f'Label shape:{label_batch.shape}')
+  output_batch = model(image_batch)
+  print(f'Output shape:{output_batch.shape}')
+  print(output_batch)
+  print(summary(model, (1,1,512, 512)))
 
   start_train = time.time()
   train_model(model = model,
               train_loader = TRAIN_LOADER,
               val_loader = VAL_LOADER,
-              num_epochs = 10,
+              num_epochs = 15,
               learning_rate = 0.001,
               checkpoint_dir = CHECKPOINT_DIR)
+  print(f'Training complete!')
   end_train = time.time()
   total_time = end_train - start_train
   hours, rem = divmod(total_time, 3600)
   minutes, seconds = divmod(rem, 60)
   print(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
   logging.info(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
+
+  # evaluating the model after training both on validation and test sets
+  evaluate(model = model, loader = VAL_LOADER, loader_type = 'valid')
+  evaluate(model = model, loader = TEST_LOADER, loader_type = 'test')
