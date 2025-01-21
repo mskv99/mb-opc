@@ -66,36 +66,50 @@ class TVLoss(nn.Module):
 
     return self.weight * tv_loss
 
-class PerceptualLoss(nn.Module):
-  def __init__(self, weight=1.0, layers=None):
-    super(PerceptualLoss, self).__init__()
-    self.weight = weight
-    # Load pretrained VGG model and select specific layers
-    vgg = models.vgg19(weights='VGG19_Weights.DEFAULT').features
-    self.layers = layers if layers else [0,5,10,19, 28] # use diferent layers for multiscale features
-    self.features = nn.ModuleList([vgg[i] for i in self.layers]).eval()
+class MobileNetPerceptualLoss(nn.Module):
+  def __init__(self, feature_extractor, selected_layers, visualize=False):
+    super(MobileNetPerceptualLoss, self).__init__()
+    self.feature_extractor = feature_extractor
+    self.selected_layers = selected_layers
+    self.feature_outputs = {}
+    self.visualize = visualize
 
-    # Freeze vgg parameters
-    for param in self.features.parameters():
+    # Register forward hooks for the selected layers
+
+    for layer_idx in self.selected_layers:
+      self.feature_extractor.features[layer_idx].register_forward_hook(
+        self.save_output(layer_idx)
+      )
+
+    for param in self.feature_extractor.parameters():
       param.requires_grad = False
 
-  def forward(self, pred, target):
-    pred, target = self.normalize_input(pred), self.normalize_input(target)
-    perceptual_loss = 0.0
-    for layer in self.features:
-      pred, target = layer(pred), layer(target)
-      perceptual_loss += F.l1_loss(pred, target)
+  def save_output(self, layer_idx):
+    """
+    Hook to save the output of the specified layer
+    """
 
-    return self.weight * perceptual_loss
+    def hook(module, input, output):
+      self.feature_outputs[layer_idx] = output
 
-  @staticmethod
-  def normalize_input(x):
-    # Normalize according to VGG preprocessing
-    mean = torch.tensor([0.485, 0.456, 0.406]).to(x.device)
-    std = torch.tensor([0.229, 0.224, 0.225]).to(x.device)
-    x = (x - mean[None, :, None, None]) / std[None, :, None, None]
+    return hook
 
-    return x
+  def forward(self, img1, img2):
+    # Forward pass through feature extractor
+    _ = self.feature_extractor(img1)
+    features1 = self.feature_outputs.copy()
+
+    _ = self.feature_extractor(img2)
+    features2 = self.feature_outputs.copy()
+
+    # Compute perceptual loss as a L1-disttance between corresponding layers
+    loss = 0
+    for layer_idx in self.selected_layers:
+      loss_iter = torch.nn.functional.l1_loss(features1[layer_idx], features2[layer_idx])
+      loss += loss_iter
+
+    return loss
+
 
 class IouLoss(nn.Module):
   def __init__(self, weight=1.0, eps=1e-6):
