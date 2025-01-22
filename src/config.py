@@ -11,5 +11,7 @@ else:
   CHECKPOINT_PATH = 'checkpoints'
 
 BATCH_SIZE = 3
-EPOCHS = 50
+EPOCHS = 20
 LEARNING_RATE = 2e-4
+LOG_WANDB = True
+RESUME = True
