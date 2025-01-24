@@ -47,7 +47,7 @@ def setup_logging(exp_folder):
                       level = logging.INFO,
                       datefmt = '%d/%m/%Y %H:%M')
 
-def validate_model(model, val_loader, current_epoch, num_epochs ,checkpoint_dir,device='cuda'):
+def validate_model(model, val_loader, current_epoch, num_epochs, checkpoint_dir,device='cuda'):
   model.eval()
   l1_loss_epoch = 0
   iou_loss_epoch = 0
@@ -205,11 +205,12 @@ def pretrain_model(model, train_loader,
                    resume = False):
   # Load checkpoint if resuming
   if resume:
-    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
+    checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_10/last_checkpoint.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer = optim.Adam(model.parameters(), lr = lr)
     scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 20, eta_min = 1e-7)
     start_epoch = checkpoint['epoch'] + 1
+    num_epochs += start_epoch
     print(f"Resuming training from epoch {start_epoch}")
     logging.info(f"Resuming training from epoch {start_epoch}")
     model.to(device)
@@ -487,9 +488,10 @@ feature_extractor.features = torch.nn.Sequential(*features)
 feature_extractor.features[1][0] = torch.nn.Conv2d(1,32, kernel_size = 3, stride = 2, padding=1)
 feature_extractor.classifier[1] = torch.nn.Linear(feature_extractor.last_channel, 1)
 
-path_to_classifier = '/home/amoskovtsev/Загрузки/mobilenet_topology_classifier_v1.pth'
+path_to_classifier = '/home/amoskovtsev/projects/mb_opc/checkpoints/mobilenet_topology_classifier_v1.pth'
 feature_extractor.load_state_dict(torch.load(path_to_classifier)['model_state_dict'])
 feature_extractor.eval()
+feature_extractor = feature_extractor.to(DEVICE)
 
 
 perceptual_loss = MobileNetPerceptualLoss(feature_extractor = feature_extractor,
