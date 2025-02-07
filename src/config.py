@@ -1,3 +1,4 @@
+
 import os
 
 if os.getenv('ENV') == 'TRAIN_MACHINE':
@@ -11,8 +12,8 @@ else:
   CHECKPOINT_PATH = 'checkpoints'
 
 BATCH_SIZE = 3
-EPOCHS = 20
+EPOCHS = 30
 LEARNING_RATE = 2e-4
 LOG_WANDB = True
-RESUME = True
+RESUME = False
 

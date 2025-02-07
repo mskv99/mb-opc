@@ -207,8 +207,8 @@ def train_model(gen_model,
 
   optimG = optim.Adam(gen_model.parameters(), lr = lr, weight_decay = 1e-5)
   optimD = optim.Adam(disc_model.parameters(), lr = lr, weight_decay = 1e-5)
-  schedG = lr_sched.CosineAnnealingLR(optimizer = optimG, T_max = 50, eta_min = 1e-7)
-  schedD = lr_sched.CosineAnnealingLR(optimizer = optimD, T_max = 50, eta_min = 1e-7)
+  schedG = lr_sched.CosineAnnealingLR(optimizer = optimG, T_max = num_epochs, eta_min = 1e-7)
+  schedD = lr_sched.CosineAnnealingLR(optimizer = optimD, T_max = num_epochs, eta_min = 1e-7)
 
   print('Starting experiment...')
   logging.info('Starting experiment...')
@@ -262,8 +262,8 @@ def train_model(gen_model,
       x = torch.cat([maskFake, maskTrue], dim = 0)
       y = torch.cat([zeros, ones], dim = 0)
       predD = disc_model(x)
-      lossD_iter = torch.nn.functional.binary_cross_entropy(predD, y)
-      lossD_iter_list.append(lossD_iter)
+      lossD_iter = torch.nn.functional.binary_cross_entropy(predD.view(-1), y)
+      lossD_iter_list.append(lossD_iter.item())
 
       optimD.zero_grad()
       lossD_iter.backward()
@@ -478,7 +478,7 @@ if LOG_WANDB:
       "optimizer": "Adam",
       "optimizer_parameters" : 'learning_rate - 2e-4, weight_decay - 1e-5',
       "scheduler" : "CosineAnnealing",
-      "scheduler_parameters" : "T_max - 20, eta_min - 1e-7",
+      "scheduler_parameters" : "T_max - 30, eta_min - 1e-7",
       "learning_rate": LEARNING_RATE,
       "epochs" : EPOCHS,
       "dataset": "1024x1024 grayscale images",
@@ -506,7 +506,7 @@ logging.info('Discriminator model initialized')
 
 if LOG_WANDB:
   wandb.watch(generator_model, log='all')
-  wandb.watch(discriminator_model, log='all)
+  wandb.watch(discriminator_model, log='all')
 
 test_image = torch.randn((1,1,1024,1024)).to(DEVICE)
 generator_output = generator_model.forward(test_image)
@@ -582,15 +582,16 @@ print(f'L1-loss shape:{l1_loss_value.shape}')
 
 start_train = time.time()
 #Train the model
-train_model(model = generator_model,
-               train_loader = TRAIN_LOADER,
-               val_loader = VALID_LOADER,
-               num_epochs = EPOCHS,
-               lr = LEARNING_RATE,
-               device = DEVICE,
-               start_epoch = 0,
-               checkpoint_dir = CHECKPOINT_DIR,
-               resume = False)
+train_model(gen_model = generator_model,
+	    disc_model = discriminator_model, 
+            train_loader = TRAIN_LOADER,
+            val_loader = VALID_LOADER,
+            num_epochs = EPOCHS,
+            lr = LEARNING_RATE,
+            device = DEVICE,
+            start_epoch = 0,
+            checkpoint_dir = CHECKPOINT_DIR,
+            resume = False)
 end_train = time.time()
 total_time = end_train - start_train
 hours, rem = divmod(total_time, 3600)
