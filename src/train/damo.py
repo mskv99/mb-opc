@@ -468,6 +468,25 @@ def train_model(gen_model,
   print('Traning complete')
   logging.info('Traning complete')
 
+if LOG_WANDB:
+  wandb.login()
+  wandb.init(
+    project = "MB-OPC",
+    name = "DAMO generator + discriminator",
+    config = {
+      "architecture": "DAMO Gen + Disc",
+      "optimizer": "Adam",
+      "optimizer_parameters" : 'learning_rate - 2e-4, weight_decay - 1e-5',
+      "scheduler" : "CosineAnnealing",
+      "scheduler_parameters" : "T_max - 20, eta_min - 1e-7",
+      "learning_rate": LEARNING_RATE,
+      "epochs" : EPOCHS,
+      "dataset": "1024x1024 grayscale images",
+      "description": "full DAMO model, training from scratch"
+    }
+
+  )
+
 CHECKPOINT_DIR = next_exp_folder(CHECKPOINT_PATH)
 DEVICE = torch.device('cpu')#torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
@@ -484,6 +503,10 @@ discriminator_model = Discriminator()
 discriminator_model = discriminator_model.to(DEVICE)
 print(f'Discriminator model initialized: {discriminator_model}')
 logging.info('Discriminator model initialized')
+
+if LOG_WANDB:
+  wandb.watch(generator_model, log='all')
+  wandb.watch(discriminator_model, log='all)
 
 test_image = torch.randn((1,1,1024,1024)).to(DEVICE)
 generator_output = generator_model.forward(test_image)
@@ -567,7 +590,7 @@ train_model(model = generator_model,
                device = DEVICE,
                start_epoch = 0,
                checkpoint_dir = CHECKPOINT_DIR,
-               resume=False)
+               resume = False)
 end_train = time.time()
 total_time = end_train - start_train
 hours, rem = divmod(total_time, 3600)
@@ -587,3 +610,6 @@ evaluate_model(model = generator_model,
                loader = TEST_LOADER,
                device = DEVICE,
                log = True)
+
+if LOG_WANDB:
+  wandb.finish()
