@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from src.models.damo import Generator, Discriminator
 from src.utils import IouLoss, next_exp_folder, IoU, PixelAccuracy, draw_plot
 from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
-from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE, LOG_WANDB
+from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE, LOG_WANDB, DEBUG_LOSS
 
 def set_random_seed(seed):
   torch.manual_seed(seed)
@@ -81,10 +81,6 @@ def validate_model(gen_model,
 
       if idx % 50 == 0:
         log_info_iter = {
-          'epoch': current_epoch,
-          'num_epochs': num_epochs,
-          'step': idx,
-          'len_valid_loader': len(val_loader),
           'val/lossG_l1/iter': lossG_l1_iter.item(),
           'val/lossG_iou/iter': lossG_iou_iter.item(),
           'val/lossG/iter': lossG_iter.item(),
@@ -92,8 +88,8 @@ def validate_model(gen_model,
           'val/iou/iter': iou_iter.item()
         }
 
-        log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
-                       f"Step [{log_info_iter['step']}/{log_info_iter['len_valid_loader']}], "
+        log_message_iter = (f"Epoch [{current_epoch}/{num_epochs}], "
+                       f"Step [{idx}/{len(val_loader)}], "
                        f"L1 Loss G: {log_info_iter['val/lossG_l1/iter']:.4f}, "
                        f"IoU Loss G: {log_info_iter['val/lossG_iou/iter']:.4f}, "
                        f"Total Loss G: {log_info_iter['val/lossG/iter']:.4f}, "
@@ -105,15 +101,7 @@ def validate_model(gen_model,
         logging.info(log_message_iter)
 
         if LOG_WANDB:
-          wandb_log_iter = {
-            'epoch': current_epoch,
-            'val/lossG_l1/iter': lossG_l1_iter.item(),
-            'val/lossG_iou/iter': lossG_iou_iter.item(),
-            'val/lossG/iter': lossG_iter.item(),
-            'val/pixel_acc/iter': pixel_acc_iter.item(),
-            'val/iou/iter': iou_iter.item()
-          }
-          wandb.log(wandb_log_iter)
+          wandb.log(log_info_iter)
 
       if idx % 200 == 0:
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
@@ -126,8 +114,6 @@ def validate_model(gen_model,
       iou_epoch += iou_iter.item()
 
     log_info_epoch = {
-      'epoch': current_epoch,
-      'num_epochs': num_epochs,
       'val/lossG_l1/epoch': lossG_l1_epoch / len(val_loader),
       'val/lossG_iou/epoch': lossG_iou_epoch / len(val_loader),
       'val/lossG/epoch': lossG_epoch / len(val_loader),
@@ -135,7 +121,7 @@ def validate_model(gen_model,
       'val/iou/epoch': iou_epoch / len(val_loader)
     }
 
-    log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
+    log_message_epoch = (f"Losses per epoch [{current_epoch}/{num_epochs}], "
                         f"L1 Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
                         f"IoU Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
                         f"Total Loss: {log_info_epoch['val/lossG/epoch']:.4f}, "
@@ -147,15 +133,7 @@ def validate_model(gen_model,
     logging.info(log_message_epoch)
 
     if LOG_WANDB:
-      wandb_log_epoch = {
-      'epoch': current_epoch,
-      'val/lossG_l1/epoch': lossG_l1_epoch / len(val_loader),
-      'val/lossG_iou/epoch': lossG_iou_epoch / len(val_loader),
-      'val/lossG/epoch': lossG_epoch / len(val_loader),
-      'val/pixel_acc/epoch': pixel_acc_epoch / len(val_loader),
-      'val/iou/epoch': iou_epoch / len(val_loader)
-      }
-      wandb.log(wandb_log_epoch)
+      wandb.log(log_info_epoch)
 
   # return average total loss, average pixel accuracy and average iou per epoch
   return log_info_epoch['val/lossG/epoch'], log_info_epoch['val/pixel_acc/epoch'], log_info_epoch['val/iou/epoch']
@@ -194,16 +172,15 @@ def evaluate_model(model, loader, device='cuda', log=False):
     logging.info(f"IoU: {log_info['iou'] / log_info['len_loader'] :.4f}")
 
 def train_model(gen_model,
-                   disc_model,
-                   train_loader,
-                   val_loader,
-                   num_epochs,
-                   lr = 2e-4,
-                   device = "cuda",
-                   start_epoch = 0,
-                   checkpoint_dir = "checkpoints",
-                   resume = False):
-
+                disc_model,
+                train_loader,
+                val_loader,
+                num_epochs,
+                lr = 2e-4,
+                device = "cuda",
+                start_epoch = 0,
+                checkpoint_dir = "checkpoints",
+                resume = False):
 
   optimG = optim.Adam(gen_model.parameters(), lr = lr, weight_decay = 1e-5)
   optimD = optim.Adam(disc_model.parameters(), lr = lr, weight_decay = 1e-5)
@@ -301,10 +278,6 @@ def train_model(gen_model,
       # logging iteration metrics
       if idx % 50 == 0:
         log_info_iter = {
-          'epoch': epoch,
-          'num_epochs': num_epochs,
-          'step': idx,
-          'len_train_loader': len(train_loader),
           'train/lossG_l1/iter': lossG_l1_iter.item(),
           'train/lossG_iou/iter': lossG_iou_iter.item(),
           'train/lossG_adv/iter': lossG_adv_iter.item(),
@@ -314,8 +287,8 @@ def train_model(gen_model,
           'train/iou/iter': iou_iter.item()
         }
 
-        log_message_iter = (f"Epoch [{log_info_iter['epoch']}/{log_info_iter['num_epochs']}], "
-                       f"Step [{log_info_iter['step']}/{log_info_iter['len_train_loader']}], "
+        log_message_iter = (f"Epoch [{epoch}/{num_epochs}], "
+                       f"Step [{idx}/{len(train_loader)}], "
                        f"L1 Loss G: {log_info_iter['train/lossG_l1/iter']:.4f}, "
                        f"IoU Loss G: {log_info_iter['train/lossG_iou/iter']:.4f}, "
                        f"Adv Loss G: {log_info_iter['train/lossG_adv/iter']:.4f}, "
@@ -328,18 +301,7 @@ def train_model(gen_model,
         logging.info(log_message_iter)
 
         if LOG_WANDB:
-          wandb_log_iter = {
-            'epoch': epoch,
-            'train/lossG_l1/iter': lossG_l1_iter.item(),
-            'train/lossG_iou/iter': lossG_iou_iter.item(),
-            'train/lossG_adv/iter': lossG_adv_iter.item(),
-            'train/lossG/iter': lossG_iter.item(),
-            'train/lossD/iter': lossD_iter.item(),
-            'train/pixel_acc/iter': pixel_acc_iter.item(),
-            'trian/iou/iter': iou_iter.item()
-          }
-
-          wandb.log(wandb_log_iter)
+          wandb.log(log_info_iter)
 
         # draw Generator and Discriminator loss plot per iteration
         draw_plot(first_variable = lossG_iter_list, second_variable = lossD_iter_list,
@@ -384,7 +346,6 @@ def train_model(gen_model,
     # logging epoch metrics
     log_info_epoch = {
       'epoch': epoch,
-      'num_epochs': num_epochs,
       'train/lossG_l1/epoch': lossG_l1_epoch / len(train_loader),
       'train/lossG_iou/epoch': lossG_iou_epoch / len(train_loader),
       'train/lossG_adv/epoch': lossG_adv_epoch / len(train_loader),
@@ -394,12 +355,12 @@ def train_model(gen_model,
       'train/iou/epoch': iou_epoch / len(train_loader)
     }
 
-    log_message_epoch = (f"Losses per epoch [{log_info_epoch['epoch']}/{log_info_epoch['num_epochs']}], "
+    log_message_epoch = (f"Losses per epoch [{epoch}/{num_epochs}], "
                         f"L1 Loss G: {log_info_epoch['train/lossG_l1/epoch']:.4f}, "
                         f"IoU Loss G: {log_info_epoch['train/lossG_iou/epoch']:.4f}, "
                         f"Adv Loss G: {log_info_epoch['train/lossG_adv/epoch']:.4f}, "
                         f"Total Loss G: {log_info_epoch['train/lossG/epoch']:.4f} "
-                        f"Adv Loss D: {log_info_epoch['train/lossD_adv/epoch']:.4f}, "
+                        f"Adv Loss D: {log_info_epoch['train/lossD/epoch']:.4f}, "
                         f"Pixel Accuracy: {log_info_epoch['train/pixel_acc/epoch']:.4f}"
                         f"IoU: {log_info_epoch['train/iou/epoch']:.4f}")
 
@@ -407,18 +368,7 @@ def train_model(gen_model,
     logging.info(log_message_epoch)
 
     if LOG_WANDB:
-      wandb_log_epoch = {
-      'epoch': epoch,
-      'train/lossG_l1/epoch': lossG_l1_epoch / len(train_loader),
-      'train/lossG_iou/epoch': lossG_iou_epoch / len(train_loader),
-      'train/lossG_adv/epoch': lossG_adv_epoch / len(train_loader),
-      'train/lossG/epoch': lossG_epoch / len(train_loader),
-      'train/lossD/epoch': lossD_epoch / len(train_loader),
-      'train/pixel_acc/epoch': pixel_acc_epoch / len(train_loader),
-      'train/iou/epoch': iou_epoch / len(train_loader)
-      }
-
-      wandb.log(wandb_log_epoch)
+      wandb.log(log_info_epoch)
 
     # get average loss, pixel accuracy and iou per epoch during training phase
     lossG_epoch_list_train.append(log_info_epoch['train/lossG/epoch'])
@@ -443,8 +393,8 @@ def train_model(gen_model,
               title='Epoch Loss Plot for train phase', xlabel='epoch',
               ylabel='loss', first_label='generator', second_label='discriminator',
               save_name='train_epoch_loss.jpg', checkpoint_dir = checkpoint_dir)
-    # draw epoch Generator loss for validation phase
 
+    # draw epoch Generator loss for validation phase
     draw_plot(first_variable = lossG_epoch_list_val, label = 'generator',
               title = 'Epoch Loss plot for valid phase', xlabel = 'Iteration',
               ylabel = 'Loss', save_name = 'generator_val_epoch_loss.jpg',
@@ -522,68 +472,56 @@ TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os
 VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(binarize_flag = True))
 TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform(binarize_flag = True))
 
-# # Define dataloader
-TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 2)
-VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
+# Define dataloader
+TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 8)
+VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 8)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 8)
 
 print(f'Number of images in train subset:{len(TRAIN_DATASET)}')
 print(f'Number of images in valid subset:{len(VALID_DATASET)}')
 print(f'Number of images in test subset:{len(TEST_DATASET)}\n')
-#
-# logging.info(f'Number of images in train subset:{len(TRAIN_DATASET)}')
-# logging.info(f'Number of images in valid subset:{len(VALID_DATASET)}')
-# logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
-#
-image, target = next(iter(TRAIN_LOADER))
-image, target = image.to(DEVICE), target.to(DEVICE)
-print(f'Image shape: {image.shape}')
-print(f'Target shape: {target.shape}')
-print(f'Image shape after removing batch dimension: {image[0,0].shape}')
 
-for p in generator_model.parameters():
-  p.requires_grad = False
-
-for p in discriminator_model.parameters():
-  p.requires_grad = True
-
-params = generator_model(image)
-maskFake = torch.sigmoid(params)
-zeros = torch.zeros([maskFake.shape[0]], dtype = maskFake.dtype, device = maskFake.device)
-maskTrue = target
-ones = torch.ones([maskTrue.shape[0]], dtype = maskTrue.dtype, device = maskTrue.device)
-x = torch.cat([maskFake, maskTrue], dim = 0)
-print(f'x shape: {x.shape}')
-y = torch.cat([zeros, ones], dim = 0)
-print(f'y shape: {y.shape}')
-predD1 = discriminator_model(x)
-lossD = torch.nn.functional.binary_cross_entropy(predD1.view(-1), y)
-print(f'Raw prediction: {predD1.shape}')
-print(f'Reshaped prediction: {predD1.view(-1).shape}')
-
-
-
-# Выполним проверку подсчёта функций потерь
-output = generator_model(image)
-print(f'Output shape: {output.shape}')
-
+# Define losses
 iou_loss = IouLoss(weight = 1.0)
 l1_loss = torch.nn.L1Loss()
+
+# Define metrics
 pixel_accuracy = PixelAccuracy()
 iou = IoU()
 
-iou_loss_value = iou_loss(target, output.sigmoid())
-l1_loss_value = l1_loss(target, output.sigmoid())
+if DEBUG_LOSS:
+  image, target = next(iter(TRAIN_LOADER))
+  image, target = image.to(DEVICE), target.to(DEVICE)
+  print(f'Image shape: {image.shape}')
+  print(f'Target shape: {target.shape}')
+  print(f'Image shape after removing batch dimension: {image[0,0].shape}')
 
-print(f'IoU loss:{iou_loss_value}')
-print(f'L1-loss:{l1_loss_value}')
-print(f'IoU loss shape:{iou_loss_value.shape}')
-print(f'L1-loss shape:{l1_loss_value.shape}')
+  params = generator_model(image)
+  maskFake = torch.sigmoid(params)
+  print(f'Generator output shape: {maskFake}')
+  zeros = torch.zeros([maskFake.shape[0]], dtype = maskFake.dtype, device = maskFake.device)
+  maskTrue = target
+  ones = torch.ones([maskTrue.shape[0]], dtype = maskTrue.dtype, device = maskTrue.device)
+  x = torch.cat([maskFake, maskTrue], dim = 0)
+  print(f'X shape: {x.shape}')
+  y = torch.cat([zeros, ones], dim = 0)
+  print(f'Y shape: {y.shape}')
+  predD1 = discriminator_model(x)
+  lossD = torch.nn.functional.binary_cross_entropy(predD1.view(-1), y)
+  print(f'Raw prediction shape: {predD1.shape}')
+  print(f'Reshaped prediction shape: {predD1.view(-1).shape}')
+
+  iou_loss_value = iou_loss(target, maskFake)
+  l1_loss_value = l1_loss(target, maskFake)
+  print(f'IoU loss: {iou_loss_value}')
+  print(f'L1-loss: {l1_loss_value}')
+  print(f'IoU loss shape: {iou_loss_value.shape}')
+  print(f'L1-loss shape: {l1_loss_value.shape}')
 
 start_train = time.time()
 #Train the model
 train_model(gen_model = generator_model,
-	    disc_model = discriminator_model, 
+	          disc_model = discriminator_model,
             train_loader = TRAIN_LOADER,
             val_loader = VALID_LOADER,
             num_epochs = EPOCHS,
