@@ -36,11 +36,12 @@ class deconv_block(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, in_ch=1, out_ch=1):
+    def __init__(self, in_ch=1, out_ch=1, skip_con_type='concat'):
         super().__init__()
 
         n1 = 32
         filters = [n1 * 2, n1 * 4, n1 * 8, n1 * 16, n1 * 32] #[64, 128, 256, 512, 1024]
+        self.skip_con_type = skip_con_type
 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.Up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
@@ -63,11 +64,19 @@ class Generator(nn.Module):
         self.res7 = conv_block(filters[4], filters[4], stride=1)
         self.res8 = conv_block(filters[4], filters[4], stride=1)
 
-        self.deconv0 = deconv_block(filters[0], n1, stride=2)
-        self.deconv1 = deconv_block(filters[1], filters[0], stride=2)
-        self.deconv2 = deconv_block(filters[2], filters[1], stride=2)
-        self.deconv3 = deconv_block(filters[3], filters[2], stride=2)
-        self.deconv4 = deconv_block(filters[4], filters[3], stride=2)
+        if self.skip_con_type == 'concat':
+            self.deconv0 = deconv_block(filters[0] * 2, n1, stride=2)
+            self.deconv1 = deconv_block(filters[1] * 2, filters[0], stride=2)
+            self.deconv2 = deconv_block(filters[2] * 2, filters[1], stride=2)
+            self.deconv3 = deconv_block(filters[3] * 2, filters[2], stride=2)
+            self.deconv4 = deconv_block(filters[4], filters[3], stride=2)
+
+        elif self.skip_con_type == 'add':
+            self.deconv0 = deconv_block(filters[0], n1, stride=2)
+            self.deconv1 = deconv_block(filters[1], filters[0], stride=2)
+            self.deconv2 = deconv_block(filters[2], filters[1], stride=2)
+            self.deconv3 = deconv_block(filters[3], filters[2], stride=2)
+            self.deconv4 = deconv_block(filters[4], filters[3], stride=2)
 
         self.conv_tail = nn.Conv2d(n1, out_ch, kernel_size=7, stride=1, padding=3)
 
@@ -91,20 +100,32 @@ class Generator(nn.Module):
         xres = self.res7(xres)
         xres = self.res8(xres)
 
-        x4_1 = self.deconv4(xres)
-        x3_1 = self.deconv3(x4_1)
-        x2_1 = self.deconv2(x3_1)
-        x1_1 = self.deconv1(x2_1)
-        x0_1 = self.deconv0(x1_1)
+        if self.skip_con_type == 'concat':
+            x4_1 = self.deconv4(xres)
+            x3_1 = self.deconv3(torch.cat([x4_1, x3_0], dim = 1))
+            x2_1 = self.deconv2(torch.cat([x3_1, x2_0], dim = 1))
+            x1_1 = self.deconv1(torch.cat([x2_1, x1_0], dim = 1))
+            x0_1 = self.deconv0(torch.cat([x1_1, x0_0], dim = 1))
 
-        output = self.conv_tail(x0_1)
+            output = self.conv_tail(x0_1)
+
+        elif self.skip_con_type == 'add':
+            x4_1 = self.deconv4(xres)
+            x3_1 = self.deconv3(x4_1) + x2_0
+            x2_1 = self.deconv2(x3_1) + x1_0
+            x1_1 = self.deconv1(x2_1) + x0_0
+            x0_1 = self.deconv0(x1_1) + x_head
+
+            output = self.conv_tail(x0_1)
+
+
         return output
 if __name__ == '__main__':
   # Define input tensor
   input_tensor = torch.randn(1, 1, 1024, 1024)  # Batch size = 1, single channel
 
   # Initialize the model
-  model = Generator()
+  model = Generator(skip_con_type='concat')
 
   # Forward pass
   output = model(input_tensor)

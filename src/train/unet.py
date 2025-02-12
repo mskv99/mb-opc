@@ -188,7 +188,7 @@ def train_model(model,
     checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_10/last_checkpoint.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer = optim.Adam(model.parameters(), lr = lr)
-    scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 20, eta_min = 1e-7)
+    scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 30, eta_min = 1e-7)
     start_epoch = checkpoint['epoch'] + 1
     num_epochs += start_epoch
     print(f"Resuming training from epoch {start_epoch}")
@@ -196,7 +196,6 @@ def train_model(model,
     model.to(device)
   else:
     optimizer = optim.Adam(model.parameters(), lr = lr, weight_decay = 1e-5)
-    # scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=5, gamma=0.5)
     scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 30, eta_min = 1e-7)
     print('Starting experiment...')
     logging.info('Starting experiment...')
@@ -361,17 +360,17 @@ if LOG_WANDB:
   wandb.login()
   wandb.init(
     project = "MB-OPC",
-    name = "DAMO generator",
+    name = "DAMO generator, skip-connections-concat",
     config = {
-      "architecture": "DAMO Generator",
+      "architecture": "DAMO Generator, ConvTranspose2D in decoder",
       "optimizer": "Adam",
       "optimizer_parameters" : 'learning_rate - 2e-4, weight_decay - 1e-5',
       "scheduler" : "CosineAnnealing",
-      "scheduler_parameters" : "T_max - 20, eta_min - 1e-7",
+      "scheduler_parameters" : "T_max - 30, eta_min - 1e-7",
       "learning_rate": LEARNING_RATE,
       "epochs" : EPOCHS,
       "dataset": "1024x1024 grayscale images",
-      "description": "pretrained DAMO generator"
+      "description": "DAMO generator with ConvTranspose2D in decoder, concatenation in skip-connections, train from scratch"
     }
   )
   
@@ -382,7 +381,7 @@ setup_logging(CHECKPOINT_DIR)
 logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 logging.info(f'Training device:{DEVICE}')
 
-generator_model = Generator(in_ch = 1, out_ch = 1)
+generator_model = Generator(in_ch = 1, out_ch = 1, skip_con_type='concat')
 generator_model = generator_model.to(DEVICE)
 print('Model initialized:', generator_model)
 logging.info('Model initialized')
