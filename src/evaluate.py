@@ -86,7 +86,7 @@ def evaluate_model(model, loader, device='cuda', log=False):
   return log_info['pixel_acc'] / log_info['len_loader'], log_info['iou'] / log_info['len_loader']
 
 if __name__ == '__main__':
-  MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_9/last_checkpoint.pth')
+  MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_22/last_checkpoint.pth')
   BATCH_SIZE = 2
   DEVICE = 'cuda'
 
@@ -99,7 +99,7 @@ if __name__ == '__main__':
   VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
   TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
 
-  generator_model = Generator(in_ch = 1, out_ch = 1)
+  generator_model = Generator(in_ch = 1, out_ch = 1, skip_con_type='concat')
   generator_model.load_state_dict(torch.load(MODEL_PATH, map_location = DEVICE)['model_state_dict'])
   generator_model = generator_model.to(DEVICE)
   pixel_accuracy = PixelAccuracy()
@@ -107,4 +107,4 @@ if __name__ == '__main__':
   # just in case we want to store the output in txt file and
   # test the function implementation
   logging.basicConfig(filename = 'log.txt',datefmt = '%d/%m/%Y %H:%M')
-  evaluate_model(model = generator_model, loader = TEST_LOADER, device = DEVICE, log = False)
+  evaluate_model(model = generator_model, loader = VALID_LOADER, device = DEVICE, log = False)

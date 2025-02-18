@@ -32,8 +32,8 @@ parser.add_argument('inference_folder', type = str, help = 'Relative path to an 
 parser.add_argument('--batch_size', type = int, default = 2, help = 'Batch size for inference')
 args = parser.parse_args()
 
-DATA_PATH = args.inference_folder # 'data/processed/gds_dataset/origin/test_origin'
-MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_9/last_checkpoint.pth') #'/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_3/last_checkpoint.pth'
+DATA_PATH = args.inference_folder
+MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_9/last_checkpoint.pth')
 OUTPUT_DIR = next_exp_folder('inference/output_img')
 BATCH_SIZE = args.batch_size
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -50,7 +50,7 @@ def save_image(output_batch, checkpoint_dir="checkpoints", image_type='true_corr
         cv2.imwrite(f"{img_save_path}", (single_image*255).detach().cpu().numpy())
         print(f"Saved generated image at {img_save_path}")
 
-generator_model = Generator(in_ch = 1, out_ch = 1)
+generator_model = Generator(in_ch = 1, out_ch = 1, skip_con_type='concat')
 # generator_model.load_state_dict(torch.load(MODEL_PATH,map_location=torch.device('cpu')))
 generator_model.load_state_dict(torch.load(MODEL_PATH, map_location = device)['model_state_dict'])
 generator_model = generator_model.to(device)
@@ -74,7 +74,6 @@ time_list= []
 for idx, (batch, batch_path) in enumerate(TEST_LOADER):
     start_time = time.time()
     batch = batch.to(device)
-    #batch_name = batch_path[0].split('/')[-1][:-4]
     with torch.no_grad():
         output_batch = generator_model(batch)
         output_mask = torch.sigmoid(output_batch)
