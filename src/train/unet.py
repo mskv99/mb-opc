@@ -54,7 +54,7 @@ def validate_model(model,
                    checkpoint_dir,
                    device = 'cuda'):
   model.eval()
-  lossG_l1_epoch = 0
+  lossG_bce_epoch = 0
   lossG_iou_epoch = 0
   lossG_epoch = 0
   pixel_acc_epoch = 0
@@ -70,9 +70,9 @@ def validate_model(model,
       params = model(image)
       mask = torch.sigmoid(params)
       # calculating loss during validation phase
-      lossG_l1_iter = l1_loss(mask, target)
+      lossG_bce_iter = bce_loss(mask, target)
       lossG_iou_iter = iou_loss(mask, target)
-      lossG_iter = lossG_l1_iter + lossG_iou_iter
+      lossG_iter = lossG_bce_iter + lossG_iou_iter
 
       # calculating metrics during validation phase
       pixel_acc_iter = pixel_accuracy(mask, target)
@@ -80,7 +80,7 @@ def validate_model(model,
 
       if idx % 10 == 0:
         log_info_iter = {
-          'val/lossG_l1/iter': lossG_l1_iter.item(),
+          'val/lossG_bce/iter': lossG_bce_iter.item(),
           'val/lossG_iou/iter': lossG_iou_iter.item(),
           'val/lossG/iter': lossG_iter.item(),
           'val/pixel_acc/iter': pixel_acc_iter.item(),
@@ -89,7 +89,7 @@ def validate_model(model,
 
         log_message_iter = (f"Epoch [{current_epoch}/{num_epochs}], "
                        f"Step [{idx}/{len(val_loader)}], "
-                       f"L1 Loss: {log_info_iter['val/lossG_l1/iter']:.4f}, "
+                       f"BCE Loss: {log_info_iter['val/lossG_bce/iter']:.4f}, "
                        f"IoU Loss: {log_info_iter['val/lossG_iou/iter']:.4f}, "
                        f"Total Loss: {log_info_iter['val/lossG/iter']:.4f}, "
                        f"Pixel Accuracy: {log_info_iter['val/pixel_acc/iter']:.4f}, "
@@ -106,14 +106,14 @@ def validate_model(model,
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
         save_generated_image(mask, current_epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction_val')
 
-      lossG_l1_epoch += lossG_l1_iter.item()
+      lossG_bce_epoch += lossG_bce_iter.item()
       lossG_iou_epoch += lossG_iou_iter.item()
       lossG_epoch += lossG_iter.item()
       pixel_acc_epoch += pixel_acc_iter.item()
       iou_epoch += iou_iter.item()
 
     log_info_epoch = {
-      'val/lossG_l1/epoch': lossG_l1_epoch / len(val_loader),
+      'val/lossG_bce/epoch': lossG_bce_epoch / len(val_loader),
       'val/lossG_iou/epoch': lossG_iou_epoch / len(val_loader),
       'val/lossG/epoch': lossG_epoch / len(val_loader),
       'val/pixel_acc/epoch': pixel_acc_epoch / len(val_loader),
@@ -121,7 +121,7 @@ def validate_model(model,
     }
 
     log_message_epoch = (f"Losses per epoch [{current_epoch}/{num_epochs}], "
-                        f"L1 Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
+                        f"BCE Loss: {log_info_epoch['val/lossG_bce/epoch']:.4f}, "
                         f"IoU Loss: {log_info_epoch['val/lossG_iou/epoch']:.4f}, "
                         f"Total Loss: {log_info_epoch['val/lossG/epoch']:.4f}, "
                         f"Pixel Accuracy: {log_info_epoch['val/pixel_acc/epoch']:.4f}, "
@@ -188,7 +188,7 @@ def train_model(model,
     checkpoint = torch.load('/mnt/data/amoskovtsev/mb_opc/checkpoints/exp_10/last_checkpoint.pth') # torch.load(os.path.join(checkpoint_dir, "checkpoint_14.10.24.pth"))
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer = optim.Adam(model.parameters(), lr = lr)
-    scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 30, eta_min = 1e-7)
+    scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 20, eta_min = 1e-7)
     start_epoch = checkpoint['epoch'] + 1
     num_epochs += start_epoch
     print(f"Resuming training from epoch {start_epoch}")
@@ -196,6 +196,7 @@ def train_model(model,
     model.to(device)
   else:
     optimizer = optim.Adam(model.parameters(), lr = lr, weight_decay = 1e-5)
+    # scheduler = lr_sched.StepLR(optimizer=optimizer, step_size=5, gamma=0.5)
     scheduler = lr_sched.CosineAnnealingLR(optimizer = optimizer, T_max = 30, eta_min = 1e-7)
     print('Starting experiment...')
     logging.info('Starting experiment...')
@@ -211,7 +212,7 @@ def train_model(model,
   model.to(device)
   torch.autograd.set_detect_anomaly(True)
   for epoch in range(start_epoch, num_epochs):
-    lossG_l1_epoch = 0
+    lossG_bce_epoch = 0
     lossG_iou_epoch = 0
     lossG_epoch = 0
     pixel_acc_epoch = 0
@@ -229,9 +230,9 @@ def train_model(model,
       mask = torch.sigmoid(params)
 
       # calculate losses during train phase
-      lossG_l1_iter = l1_loss(mask, target)
+      lossG_bce_iter = bce_loss(mask, target)
       lossG_iou_iter = iou_loss(mask, target)
-      lossG_iter = lossG_l1_iter + lossG_iou_iter
+      lossG_iter = lossG_bce_iter + lossG_iou_iter
       lossG_iter_list.append(lossG_iter.item())
 
       # calculate metrics during train phase
@@ -245,7 +246,7 @@ def train_model(model,
       if idx % 50 == 0:
         # Create a dictionary to hold your log information
         log_info_iter = {
-          'train/lossG_l1/iter': lossG_l1_iter.item(),
+          'train/lossG_bce/iter': lossG_bce_iter.item(),
           'train/lossG_iou/iter': lossG_iou_iter.item(),
           'train/lossG/iter': lossG_iter.item(),
           'train/pixel_acc/iter': pixel_acc_iter.item(),
@@ -254,7 +255,7 @@ def train_model(model,
 
         log_message_iter = (f"Epoch [{epoch}/{num_epochs}], "
                        f"Step [{idx}/{len(train_loader)}], "
-                       f"L1 Loss: {log_info_iter['train/lossG_l1/iter']:.4f}, "
+                       f"BCE Loss: {log_info_iter['train/lossG_bce/iter']:.4f}, "
                        f"IoU Loss: {log_info_iter['train/lossG_iou/iter']:.4f}, "
                        f"Total Loss: {log_info_iter['train/lossG/iter']:.4f}, "
                        f"Pixel Accuracy: {log_info_iter['train/pixel_acc/iter']:.4f}, "
@@ -276,7 +277,7 @@ def train_model(model,
         # save generated mask
         save_generated_image(mask, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
 
-      lossG_l1_epoch += lossG_l1_iter.item()
+      lossG_bce_epoch += lossG_bce_iter.item()
       lossG_iou_epoch += lossG_iou_iter.item()
       lossG_epoch += lossG_iter.item()
 
@@ -296,7 +297,7 @@ def train_model(model,
 
     log_info_epoch = {
       'epoch': epoch,
-      'train/lossG_l1/epoch': lossG_l1_epoch / len(train_loader),
+      'train/lossG_bce/epoch': lossG_bce_epoch / len(train_loader),
       'train/lossG_iou/epoch': lossG_iou_epoch / len(train_loader),
       'train/lossG/epoch': lossG_epoch / len(train_loader),
       'train/pixel_acc/epoch': pixel_acc_epoch / len(train_loader),
@@ -304,7 +305,7 @@ def train_model(model,
     }
 
     log_message_epoch = (f"Losses per epoch [{epoch}/{num_epochs}], "
-                        f"L1 Loss: {log_info_epoch['train/lossG_l1/epoch']:.4f}, "
+                        f"BCE Loss: {log_info_epoch['train/lossG_bce/epoch']:.4f}, "
                         f"IoU Loss: {log_info_epoch['train/lossG_iou/epoch']:.4f}, "
                         f"Total Loss: {log_info_epoch['train/lossG/epoch']:.4f}"
                         f"Pixel Accuracy: {log_info_epoch['train/pixel_acc/epoch']:.4f}"
@@ -360,9 +361,9 @@ if LOG_WANDB:
   wandb.login()
   wandb.init(
     project = "MB-OPC",
-    name = "DAMO generator, skip-connections-concat",
+    name = "DAMO generator, BCE-loss",
     config = {
-      "architecture": "DAMO Generator, ConvTranspose2D in decoder",
+      "architecture": "DAMO Generator, ConvTranspose2d in decoder",
       "optimizer": "Adam",
       "optimizer_parameters" : 'learning_rate - 2e-4, weight_decay - 1e-5',
       "scheduler" : "CosineAnnealing",
@@ -370,7 +371,7 @@ if LOG_WANDB:
       "learning_rate": LEARNING_RATE,
       "epochs" : EPOCHS,
       "dataset": "1024x1024 grayscale images",
-      "description": "DAMO generator with ConvTranspose2D in decoder, concatenation in skip-connections, train from scratch"
+      "description": "DAMO generator, BCE-loss, train from scratch"
     }
   )
   
@@ -381,7 +382,7 @@ setup_logging(CHECKPOINT_DIR)
 logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 logging.info(f'Training device:{DEVICE}')
 
-generator_model = Generator(in_ch = 1, out_ch = 1, skip_con_type='concat')
+generator_model = Generator(in_ch = 1, out_ch = 1)
 generator_model = generator_model.to(DEVICE)
 print('Model initialized:', generator_model)
 logging.info('Model initialized')
@@ -408,7 +409,7 @@ logging.info(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
 # Define loss functions
 iou_loss = IouLoss(weight=1.0)
-l1_loss = torch.nn.L1Loss()
+bce_loss = torch.nn.BCELoss()
 
 # Define metrics
 pixel_accuracy = PixelAccuracy()
@@ -426,12 +427,12 @@ if DEBUG_LOSS:
   print(f'Output shape: {output.shape}')
 
   iou_loss_value = iou_loss(target, output.sigmoid())
-  l1_loss_value = l1_loss(target, output.sigmoid())
+  bce_loss_value = bce_loss(target, output.sigmoid())
 
   print(f'IoU loss:{iou_loss_value}')
-  print(f'L1-loss:{l1_loss_value}')
+  print(f'BCE-loss:{bce_loss_value}')
   print(f'IoU loss shape:{iou_loss_value.shape}')
-  print(f'L1-loss shape:{l1_loss_value.shape}')
+  print(f'BCE-loss shape:{bce_loss_value.shape}')
 
 start_train = time.time()
 # Train the model

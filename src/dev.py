@@ -15,7 +15,7 @@ from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss, PixelAccuracy
 
 matplotlib.use('Agg')
 
-MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_3/last_checkpoint.pth')
+MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_16/last_checkpoint.pth')
 OUTPUT_DIR = 'data/external'
 DEVICE = torch.device('cuda:0')
 CHECK_DIMENSIONS = True
@@ -74,6 +74,7 @@ contour_loss = ContourLoss(weight=1.0, device=DEVICE)
 mse_loss = torch.nn.MSELoss()
 iou_loss = IouLoss(weight=1.0)
 pixel_acc = PixelAccuracy()
+bce = torch.nn.BCELoss()
 
 image, target = next(iter(TEST_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
@@ -89,12 +90,14 @@ contour_loss_iter = contour_loss(pred, target)
 mse_loss_iter = mse_loss(pred, target)
 iou_loss_iter = iou_loss(pred, target)
 tv_loss_pred = tv_loss(pred.sigmoid())
+bce_loss = bce(pred, target)
 total_loss = mse_loss_iter + contour_loss_iter + iou_loss_iter
 print(f'contour loss:{contour_loss_iter}')
 
 print(f'mse loss:{mse_loss_iter}')
 print(f'iou_loss:{iou_loss_iter}')
 print(f'tv loss pred:{tv_loss_pred}')
+print(f'bce loss:{bce_loss}')
 print(total_loss)
 
 pixel_acc = PixelAccuracy()

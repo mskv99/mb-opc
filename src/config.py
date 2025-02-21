@@ -11,7 +11,7 @@ else:
   CLASSIFACTION_DATA_PATH = '/workarea/otdMDP/users/amoskovtsev/Pycharm_proj/MB_OPC/custom_unet/data/processed/classifier'
   CHECKPOINT_PATH = 'checkpoints'
 
-BATCH_SIZE = 3
+BATCH_SIZE = 6
 EPOCHS = 30
 LEARNING_RATE = 2e-4
 LOG_WANDB = True
