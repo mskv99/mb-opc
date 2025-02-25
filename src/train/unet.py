@@ -363,7 +363,7 @@ if LOG_WANDB:
     project = "MB-OPC",
     name = "DAMO generator",
     config = {
-      "architecture": "DAMO Generator, UpSample + Conv2d in decoder",
+      "architecture": "DAMO Generator, ConvTranspose2d in decoder",
       "optimizer": "Adam",
       "optimizer_parameters": 'learning_rate - 2e-4, weight_decay - 1e-5',
       "scheduler" : "CosineAnnealing",
@@ -371,7 +371,7 @@ if LOG_WANDB:
       "learning_rate": LEARNING_RATE,
       "epochs" : EPOCHS,
       "dataset": "1024x1024 grayscale images",
-      "description": "DAMO generator with Upsample + Conv2d in decoder, train from scratch"
+      "description": "DAMO generator, train from scratch"
     }
   )
   
