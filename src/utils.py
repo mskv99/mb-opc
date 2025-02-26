@@ -1,35 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage import distance_transform_edt
-from torchvision import models
 import matplotlib.pyplot as plt
 import os
-
-def compute_distance_map(mask):
-  '''
-  Compute dostance map for the binary mask.
-  For each pixel, the distance map gives a distance to the nearest boundary
-  :param mask:
-  :return:
-  '''
-  mask = mask.cpu().numpy()
-  distance_map = distance_transform_edt(mask) + distance_transform_edt(1 - mask)
-
-  return torch.tensor(distance_map).float()
-
-class BoundaryLoss(nn.Module):
-  def __init__(self, weight=1.0, device='cpu'):
-    super(BoundaryLoss, self).__init__()
-    self.weight = weight
-    self.device = device
-  def forward(self, pred, target):
-    # Convert target to ddistance maps
-    dist_maps = torch.stack([compute_distance_map(t) for t in target]).to(self.device)
-    # Compute boundary loss
-    boundary_loss = torch.mean(pred * dist_maps)
-
-    return torch.from_numpy(self.weight * boundary_loss)
 
 class ContourLoss(nn.Module):
   def __init__(self, weight=1.0, device='cpu'):
@@ -110,7 +83,6 @@ class MobileNetPerceptualLoss(nn.Module):
 
     return loss
 
-
 class IouLoss(nn.Module):
   def __init__(self, weight=1.0, eps=1e-6):
     super(IouLoss, self).__init__()
@@ -148,7 +120,6 @@ class PixelAccuracy(nn.Module):
     pixel_acc = (correct + self.eps) / (total + self.eps)
 
     return pixel_acc
-
 
 def get_next_experiment_folder(checkpoints_dir):
   # Ensure the checkpoints directory exists
