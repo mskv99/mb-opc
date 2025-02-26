@@ -1,0 +1,31 @@
+[project]
+name = "mb-opc"
+version = "0.1.0"
+description = "deep-learning based tool to perform model-based optical proximity correction in photolithography"
+authors = [
+    {name = "moskovtsev andrei",email = "moskovtsev.af@phystech.edu"}
+]
+readme = "README.md"
+requires-python = ">=3.9,<4.0"
+dependencies = [
+    "gdspy (==1.6.13)",
+    "matplotlib (==3.9.2)",
+    "numpy (==1.26.4)",
+    "opencv-python (==4.10.0.84)",
+    "pillow (==11.0.0)",
+    "torch (==2.0.0)",
+    "torchvision (==0.15.1)",
+    "tqdm (==4.66.5)",
+    "torchinfo (>=1.8.0,<2.0.0)",
+    "einops (>=0.8.1,<0.9.0)",
+    "gdsast (>=1.0.2,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+wandb = "^0.19.7"
+
