@@ -150,6 +150,29 @@ class CFNONet(nn.Module):
 
     self.tail = nn.Sequential(self.deconv0a, self.deconv0b, self.deconv1a, self.deconv1b, self.deconv2a, self.deconv2b,
                               self.conv3, self.conv4, self.conv5, self.conv6)
+    self._initialize_weights()
+
+  def _initialize_weights(self):
+      """Internal weight initialization method"""
+      for m in self.modules():
+          if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+              nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+              if m.bias is not None:
+                  nn.init.constant_(m.bias, 0)
+          elif isinstance(m, nn.Linear):
+              nn.init.xavier_normal_(m.weight)
+              if m.bias is not None:
+                  nn.init.constant_(m.bias, 0)
+          elif isinstance(m, ComplexLinear):
+              nn.init.xavier_normal_(m.fc_r.weight)
+              nn.init.xavier_normal_(m.fc_i.weight)
+              if m.fc_r.bias is not None:
+                  nn.init.constant_(m.fc_r.bias, 0)
+                  nn.init.constant_(m.fc_i.bias, 0)
+          elif isinstance(m, nn.BatchNorm2d):
+              nn.init.constant_(m.weight, 1)
+              nn.init.constant_(m.bias, 0)
+
   def forward(self, x):
     br0 = self.cfno0(x)
     br1 = self.cfno1(x)
