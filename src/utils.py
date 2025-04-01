@@ -6,6 +6,7 @@ from torchvision import models
 import matplotlib.pyplot as plt
 import os
 
+
 def compute_distance_map(mask):
   '''
   Compute dostance map for the binary mask.
@@ -18,53 +19,68 @@ def compute_distance_map(mask):
 
   return torch.tensor(distance_map).float()
 
+
 class BoundaryLoss(nn.Module):
   def __init__(self, weight=1.0, device='cpu'):
     super(BoundaryLoss, self).__init__()
     self.weight = weight
     self.device = device
+
   def forward(self, pred, target):
-    # Convert target to ddistance maps
+    # Convert target to distance maps
     dist_maps = torch.stack([compute_distance_map(t) for t in target]).to(self.device)
     # Compute boundary loss
     boundary_loss = torch.mean(pred * dist_maps)
 
     return torch.from_numpy(self.weight * boundary_loss)
 
+
 class ContourLoss(nn.Module):
   def __init__(self, weight=1.0, device='cpu'):
     super(ContourLoss, self).__init__()
     self.weight = weight
     self.device = device
-    self.sobel_kernel_x = torch.tensor([[1, 0, -1], [2, 0, -2], [1,0,-1]], dtype = torch.float32, device = device).view(1,1,3,3)
-    self.sobel_kernel_y = torch.tensor([[1,2,1], [0,0,0], [-1, -2, -1]], dtype = torch.float32, device = device).view(1,1,3,3)
+    self.sobel_kernel_x = torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=torch.float32, device=device).view(1,
+                                                                                                                      1,
+                                                                                                                      3,
+                                                                                                                      3)
+    self.sobel_kernel_y = torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], dtype=torch.float32, device=device).view(1,
+                                                                                                                      1,
+                                                                                                                      3,
+                                                                                                                      3)
+
   def forward(self, pred, target):
-    target_edge_x = torch.nn.functional.conv2d(target, self.sobel_kernel_x, padding = 1)
-    target_edge_y = torch.nn.functional.conv2d(target, self.sobel_kernel_y, padding = 1)
+    target_edge_x = torch.nn.functional.conv2d(target, self.sobel_kernel_x, padding=1)
+    target_edge_y = torch.nn.functional.conv2d(target, self.sobel_kernel_y, padding=1)
     target_edge = torch.sqrt(target_edge_x ** 2 + target_edge_y ** 2 + 1e-6)
 
-    pred_edge_x = torch.nn.functional.conv2d(pred, self.sobel_kernel_x, padding = 1)
-    pred_edge_y = torch.nn.functional.conv2d(pred, self.sobel_kernel_y, padding = 1)
+    pred_edge_x = torch.nn.functional.conv2d(pred, self.sobel_kernel_x, padding=1)
+    pred_edge_y = torch.nn.functional.conv2d(pred, self.sobel_kernel_y, padding=1)
     pred_edge = torch.sqrt(pred_edge_x ** 2 + pred_edge_y ** 2 + 1e-6)
 
     # calculate difference for every predicted and target correction in a batch
-    loss_per_image = torch.abs(pred_edge - target_edge).sum(dim=(1,2,3)) # (N, ), sum over height, width and channels
+    loss_per_image = torch.abs(pred_edge - target_edge).sum(dim=(1, 2, 3))  # (N, ), sum over height, width and channels
     # calculate the contour area for every target correction in a batch
-    target_edge_sum = target_edge.sum(dim=(1,2,3)) + 1e-6 # (N, ) sum over height, width, and prevent division by zero
+    target_edge_sum = target_edge.sum(
+      dim=(1, 2, 3)) + 1e-6  # (N, ) sum over height, width, and prevent division by zero
     # normalise the difference by the contour area of target correction
     mean_loss = (loss_per_image / target_edge_sum) * self.weight
 
     # return mean value over a batch
     return mean_loss.mean()  # (),
 
+
 class TVLoss(nn.Module):
   def __init__(self, weight=1.0):
     super(TVLoss, self).__init__()
     self.weight = weight
+
   def forward(self, x):
-    tv_loss = torch.sum(torch.abs(x[:,:,1:,:] - x[:, :, :-1, :])) + torch.sum(torch.abs(x[:,:,:,1:] - x[:, :, :, :-1]))
+    tv_loss = torch.sum(torch.abs(x[:, :, 1:, :] - x[:, :, :-1, :])) + torch.sum(
+      torch.abs(x[:, :, :, 1:] - x[:, :, :, :-1]))
 
     return self.weight * tv_loss
+
 
 class MobileNetPerceptualLoss(nn.Module):
   def __init__(self, feature_extractor, selected_layers, visualize=False):
@@ -116,11 +132,13 @@ class IouLoss(nn.Module):
     super(IouLoss, self).__init__()
     self.weight = weight
     self.eps = eps
+
   def forward(self, pred, target):
     intersection = (pred * target).sum(dim=(2, 3))
     union = (pred + target).sum(dim=(2, 3)) - intersection
     iou = (intersection + self.eps) / (union + self.eps)
     return (1 - iou.mean()) * self.weight
+
 
 class IoU(nn.Module):
   def __init__(self, eps=1e-6):
@@ -133,6 +151,7 @@ class IoU(nn.Module):
     iou = (intersection + self.eps) / (union + self.eps)
 
     return iou.mean()
+
 
 class PixelAccuracy(nn.Module):
   def __init__(self, eps=1e-6):
@@ -164,6 +183,7 @@ def get_next_experiment_folder(checkpoints_dir):
       return exp_folder
     exp_number += 1
 
+
 def next_exp_folder(checkpoints_dir):
   if not os.path.exists(checkpoints_dir):
     os.makedirs(checkpoints_dir)
@@ -175,12 +195,13 @@ def next_exp_folder(checkpoints_dir):
   os.makedirs(new_exp_folder)
   return new_exp_folder
 
+
 def draw_plot(**kwargs):
   # plotting single variable on a plot
 
   if len(kwargs) == 7:
     plt.figure(figsize=(8, 6))
-    plt.plot(kwargs['first_variable'], linestyle='-', label= kwargs['label'])
+    plt.plot(kwargs['first_variable'], linestyle='-', label=kwargs['label'])
     plt.title(kwargs['title'])
     plt.xlabel(kwargs['xlabel'])
     plt.ylabel(kwargs['ylabel'])
@@ -192,8 +213,8 @@ def draw_plot(**kwargs):
   # plotting two variables on a plot
   elif len(kwargs) == 9:
     plt.figure(figsize=(8, 6))
-    plt.plot(kwargs['first_variable'], linestyle='-', color='r', label= kwargs['first_label'])
-    plt.plot(kwargs['second_variable'], linestyle='-', color='b',label = kwargs['second_label'])
+    plt.plot(kwargs['first_variable'], linestyle='-', color='r', label=kwargs['first_label'])
+    plt.plot(kwargs['second_variable'], linestyle='-', color='b', label=kwargs['second_label'])
     plt.title(kwargs['title'])
     plt.xlabel(kwargs['xlabel'])
     plt.ylabel(kwargs['ylabel'])
@@ -202,17 +223,18 @@ def draw_plot(**kwargs):
     plt.savefig(os.path.join(kwargs['checkpoint_dir'], kwargs['save_name']))
     plt.close()
 
+
 if __name__ == '__main__':
   a = [1, 2, 3, 4, 5, 20, 30, 50, 90, 100]
   b = [0, 2, 3, 4, 10, 11, 12, 80, 110, 120]
 
-  draw_plot(first_variable = a, label = 'loss',
-            title = 'Loss plot', xlabel = 'loss value',
-            ylabel = 'iteration', save_name = 'test_graph.jpg',
-            checkpoint_dir = 'data/external')
+  draw_plot(first_variable=a, label='loss',
+            title='Loss plot', xlabel='loss value',
+            ylabel='iteration', save_name='test_graph.jpg',
+            checkpoint_dir='data/external')
   draw_plot(first_variable=a, second_variable=b,
             title='Loss plot', xlabel='loss value',
-            ylabel='iteration',first_label='iou_train', second_label='iou_val',
+            ylabel='iteration', first_label='iou_train', second_label='iou_val',
             save_name='iou_graph.jpg', checkpoint_dir='data/external')
 
 '''
