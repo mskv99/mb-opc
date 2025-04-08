@@ -10,23 +10,25 @@ import matplotlib.pyplot as plt
 
 from models.unet import Generator
 from dataset import OPCDataset, TestDataset, BinarizeTransform
-from config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE
+from config import DATASET_PATH, CHECKPOINT_PATH
 from utils import BoundaryLoss, TVLoss, ContourLoss, IouLoss, PixelAccuracy
 
 matplotlib.use('Agg')
 
-MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_16/last_checkpoint.pth')
+MODEL_PATH = os.path.join(CHECKPOINT_PATH, 'exp_22/last_checkpoint.pth')
 OUTPUT_DIR = 'data/external'
 DEVICE = torch.device('cuda:0')
 CHECK_DIMENSIONS = True
-SAVE_PREDICTION = False
+SAVE_PREDICTION = True
+BATCH_SIZE = 1
 
-generator_model = Generator(in_ch = 1, out_ch = 1)
+generator_model = Generator(in_ch=1, out_ch=1)
 # generator_model.load_state_dict(torch.load(MODEL_PATH,map_location=torch.device('cpu')))
-generator_model.load_state_dict(torch.load(MODEL_PATH, map_location = DEVICE)['model_state_dict'])
+generator_model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE)['model_state_dict'])
 generator_model = generator_model.to(DEVICE)
 generator_model.eval()
 print('Model initialized:', generator_model)
+
 
 def set_random_seed(seed):
   torch.manual_seed(seed)
@@ -36,7 +38,9 @@ def set_random_seed(seed):
   np.random.seed(seed)
   random.seed(seed)
 
+
 set_random_seed(42)
+
 
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
   '''
@@ -55,50 +59,54 @@ def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", imag
   cv2.imwrite(f"{img_save_path}", (single_image * 255).detach().cpu().numpy())
   print(f"Saved generated image at {img_save_path}")
 
+
 TRANSFORM = transforms.Compose([
-    transforms.Resize((1024, 1024)),
-    transforms.ToTensor(),
-    transforms.Grayscale(),
-    BinarizeTransform(threshold=0.5)
+  transforms.Resize((1024, 1024)),
+  transforms.ToTensor(),
+  transforms.Grayscale(),
+  BinarizeTransform(threshold=0.5)
 ])
 
 TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'),
                           os.path.join(DATASET_PATH, 'correction/test_correction'),
-                          transform = TRANSFORM)
+                          transform=TRANSFORM)
 
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False)
 
 # define loss functions
 tv_loss = TVLoss(weight=1.0)
 contour_loss = ContourLoss(weight=1.0, device=DEVICE)
-mse_loss = torch.nn.MSELoss()
+mae_loss = torch.nn.L1Loss()
 iou_loss = IouLoss(weight=1.0)
 pixel_acc = PixelAccuracy()
 bce = torch.nn.BCELoss()
+boundary_loss = BoundaryLoss(device=DEVICE)
 
 image, target = next(iter(TEST_LOADER))
 image, target = image.to(DEVICE), target.to(DEVICE)
 print(f'Image shape: {image.shape}')
 print(f'Slice from image: {image[:1].shape}')
 print(f'Target shape: {target.shape}')
-print(f'Image shape after removing batch dimension: {image[0,0].shape}')
+print(f'Image shape after removing batch dimension: {image[0, 0].shape}')
 
 with torch.no_grad():
   pred = generator_model(image).sigmoid()
 
+cv2.imwrite(f"data/external/conf1.jpg", (image.squeeze() * 255).detach().cpu().numpy())
 contour_loss_iter = contour_loss(pred, target)
-mse_loss_iter = mse_loss(pred, target)
+mae_loss_iter = mae_loss(pred, target)
 iou_loss_iter = iou_loss(pred, target)
 tv_loss_pred = tv_loss(pred.sigmoid())
 bce_loss = bce(pred, target)
-total_loss = mse_loss_iter + contour_loss_iter + iou_loss_iter
-print(f'contour loss:{contour_loss_iter}')
+bd_loss = boundary_loss(pred, target)
+total_loss = mae_loss_iter + contour_loss_iter + iou_loss_iter
 
-print(f'mse loss:{mse_loss_iter}')
+print(f'contour loss:{contour_loss_iter}')
+print(f'mse loss:{mae_loss_iter}')
 print(f'iou_loss:{iou_loss_iter}')
 print(f'tv loss pred:{tv_loss_pred}')
 print(f'bce loss:{bce_loss}')
-print(total_loss)
+print(f'Boundary loss:{bd_loss}')
 
 pixel_acc = PixelAccuracy()
 accuracy = pixel_acc(pred, target)
@@ -122,5 +130,3 @@ if CHECK_DIMENSIONS:
 
 if SAVE_PREDICTION:
   save_generated_image(pred, epoch=0, step=0, checkpoint_dir=OUTPUT_DIR, image_type='generated_test')
-
-

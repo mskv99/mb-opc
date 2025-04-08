@@ -244,7 +244,7 @@ def train_model(model,
       params = model(image)
       mask = torch.sigmoid(params)
 
-      # calculate losses during train phase
+      # calculate loss during train phase
       lossG_bce_iter = bce_loss(mask, target)
       lossG_iou_iter = iou_loss(mask, target)
       lossG_bd_iter = bd_loss(mask, target)
@@ -353,7 +353,7 @@ def train_model(model,
     iou_epoch_list_val.append(iou_epoch_val)
     pixel_acc_epoch_list_val.append(pixel_acc_epoch_val)
 
-    # draw epoch losses for training and validation phases
+    # draw epoch loss for training and validation phases
     draw_plot(first_variable=lossG_epoch_list_train, second_variable=lossG_epoch_list_val,
               title='Loss plot', xlabel='epoch',
               ylabel='loss', first_label='train_loss', second_label='valid_loss',
@@ -381,7 +381,7 @@ if LOG_WANDB:
   wandb.login()
   wandb.init(
     project="MB-OPC",
-    name="DAMO generator, BCE + BD losses",
+    name="DAMO generator, BCE + BD loss",
     config={
       "architecture": "DAMO Generator, skip-connections concat",
       "optimizer": "Adam",

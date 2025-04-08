@@ -32,7 +32,7 @@ class BoundaryLoss(nn.Module):
     # Compute boundary loss
     boundary_loss = torch.mean(pred * dist_maps)
 
-    return torch.from_numpy(self.weight * boundary_loss)
+    return self.weight * boundary_loss
 
 
 class ContourLoss(nn.Module):

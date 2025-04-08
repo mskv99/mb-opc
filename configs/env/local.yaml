@@ -1,0 +1,3 @@
+paths:
+  dataset: "data/processed/gds_dataset"  # Local machine paths
+  checkpoint: "checkpoints/"

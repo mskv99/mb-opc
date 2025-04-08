@@ -1,0 +1,4 @@
+model:
+  _target_: src.models.unet.Generator
+  in_ch: 1
+  out_ch: 1

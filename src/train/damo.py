@@ -19,6 +19,7 @@ from src.utils import IouLoss, next_exp_folder, IoU, PixelAccuracy, draw_plot
 from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
 from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE, LOG_WANDB, DEBUG_LOSS
 
+
 def set_random_seed(seed):
   torch.manual_seed(seed)
   torch.cuda.manual_seed(seed)
@@ -27,10 +28,12 @@ def set_random_seed(seed):
   np.random.seed(seed)
   random.seed(seed)
 
+
 set_random_seed(42)
 
+
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
-  single_image = output[0].squeeze(dim = 0)
+  single_image = output[0].squeeze(dim=0)
   single_image[single_image > 0.5] = 1.0
   single_image[single_image <= 0.5] = 0.0
 
@@ -39,12 +42,13 @@ def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", imag
   print(f"Saved generated image at {img_save_path}")
   logging.info(f"Saved generated image at {img_save_path}")
 
+
 def setup_logging(exp_folder):
   # Set up logging configuration
   log_file_path = os.path.join(exp_folder, 'training_log.txt')
-  logging.basicConfig(filename = log_file_path,
-                      level = logging.INFO,
-                      datefmt = '%d/%m/%Y %H:%M')
+  logging.basicConfig(filename=log_file_path,
+                      level=logging.INFO,
+                      datefmt='%d/%m/%Y %H:%M')
 
 
 def validate_model(gen_model,
@@ -89,12 +93,12 @@ def validate_model(gen_model,
         }
 
         log_message_iter = (f"Epoch [{current_epoch}/{num_epochs}], "
-                       f"Step [{idx}/{len(val_loader)}], "
-                       f"L1 Loss G: {log_info_iter['val/lossG_l1/iter']:.4f}, "
-                       f"IoU Loss G: {log_info_iter['val/lossG_iou/iter']:.4f}, "
-                       f"Total Loss G: {log_info_iter['val/lossG/iter']:.4f}, "
-                       f"Pixel Accuracy: {log_info_iter['val/pixel_acc/iter']:.4f}, "
-                       f"IoU: {log_info_iter['val/iou/iter']:.4f}")
+                            f"Step [{idx}/{len(val_loader)}], "
+                            f"L1 Loss G: {log_info_iter['val/lossG_l1/iter']:.4f}, "
+                            f"IoU Loss G: {log_info_iter['val/lossG_iou/iter']:.4f}, "
+                            f"Total Loss G: {log_info_iter['val/lossG/iter']:.4f}, "
+                            f"Pixel Accuracy: {log_info_iter['val/pixel_acc/iter']:.4f}, "
+                            f"IoU: {log_info_iter['val/iou/iter']:.4f}")
 
         # Print and log the message
         print(log_message_iter)
@@ -105,7 +109,8 @@ def validate_model(gen_model,
 
       if idx % 200 == 0:
         # save_generated_image(target, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='true_correction')
-        save_generated_image(mask, current_epoch, idx, checkpoint_dir = checkpoint_dir, image_type='generated_correction_val')
+        save_generated_image(mask, current_epoch, idx, checkpoint_dir=checkpoint_dir,
+                             image_type='generated_correction_val')
 
       lossG_l1_epoch += lossG_l1_iter.item()
       lossG_iou_epoch += lossG_iou_iter.item()
@@ -122,11 +127,11 @@ def validate_model(gen_model,
     }
 
     log_message_epoch = (f"Losses per epoch [{current_epoch}/{num_epochs}], "
-                        f"L1 Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
-                        f"IoU Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
-                        f"Total Loss: {log_info_epoch['val/lossG/epoch']:.4f}, "
-                        f"Pixel Accuracy: {log_info_epoch['val/pixel_acc/epoch']:.4f}, "
-                        f"IoU: {log_info_epoch['val/iou/epoch']:.4f}")
+                         f"L1 Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
+                         f"IoU Loss: {log_info_epoch['val/lossG_l1/epoch']:.4f}, "
+                         f"Total Loss: {log_info_epoch['val/lossG/epoch']:.4f}, "
+                         f"Pixel Accuracy: {log_info_epoch['val/pixel_acc/epoch']:.4f}, "
+                         f"IoU: {log_info_epoch['val/iou/epoch']:.4f}")
 
     # Print and log the message
     print(log_message_epoch)
@@ -137,6 +142,7 @@ def validate_model(gen_model,
 
   # return average total loss, average pixel accuracy and average iou per epoch
   return log_info_epoch['val/lossG/epoch'], log_info_epoch['val/pixel_acc/epoch'], log_info_epoch['val/iou/epoch']
+
 
 def evaluate_model(model, loader, device='cuda', log=False):
   model.eval()
@@ -171,21 +177,21 @@ def evaluate_model(model, loader, device='cuda', log=False):
     logging.info(f"Pixel Accuracy: {log_info['pixel_acc'] / log_info['len_loader'] :.4f}, ")
     logging.info(f"IoU: {log_info['iou'] / log_info['len_loader'] :.4f}")
 
+
 def train_model(gen_model,
                 disc_model,
                 train_loader,
                 val_loader,
                 num_epochs,
-                lr = 2e-4,
-                device = "cuda",
-                start_epoch = 0,
-                checkpoint_dir = "checkpoints",
-                resume = False):
-
-  optimG = optim.Adam(gen_model.parameters(), lr = lr, weight_decay = 1e-5)
-  optimD = optim.Adam(disc_model.parameters(), lr = lr, weight_decay = 1e-5)
-  schedG = lr_sched.CosineAnnealingLR(optimizer = optimG, T_max = num_epochs, eta_min = 1e-7)
-  schedD = lr_sched.CosineAnnealingLR(optimizer = optimD, T_max = num_epochs, eta_min = 1e-7)
+                lr=2e-4,
+                device="cuda",
+                start_epoch=0,
+                checkpoint_dir="checkpoints",
+                resume=False):
+  optimG = optim.Adam(gen_model.parameters(), lr=lr, weight_decay=1e-5)
+  optimD = optim.Adam(disc_model.parameters(), lr=lr, weight_decay=1e-5)
+  schedG = lr_sched.CosineAnnealingLR(optimizer=optimG, T_max=num_epochs, eta_min=1e-7)
+  schedD = lr_sched.CosineAnnealingLR(optimizer=optimD, T_max=num_epochs, eta_min=1e-7)
 
   print('Starting experiment...')
   logging.info('Starting experiment...')
@@ -233,11 +239,11 @@ def train_model(gen_model,
         p.requires_grad = True
 
       maskFake = gen_model(image).sigmoid()
-      zeros = torch.zeros([maskFake.shape[0]], dtype = maskFake.dtype, device = maskFake.device)
+      zeros = torch.zeros([maskFake.shape[0]], dtype=maskFake.dtype, device=maskFake.device)
       maskTrue = target
-      ones = torch.ones([maskTrue.shape[0]], dtype = maskTrue.dtype, device = maskTrue.device)
-      x = torch.cat([maskFake, maskTrue], dim = 0)
-      y = torch.cat([zeros, ones], dim = 0)
+      ones = torch.ones([maskTrue.shape[0]], dtype=maskTrue.dtype, device=maskTrue.device)
+      x = torch.cat([maskFake, maskTrue], dim=0)
+      y = torch.cat([zeros, ones], dim=0)
       predD = disc_model(x)
       lossD_iter = torch.nn.functional.binary_cross_entropy(predD.view(-1), y)
       lossD_iter_list.append(lossD_iter.item())
@@ -259,7 +265,7 @@ def train_model(gen_model,
       maskG = gen_model(image).sigmoid()
       predD = disc_model(maskG)
 
-      # calculate losses for generator
+      # calculate loss for generator
       lossG_adv_iter = -torch.mean(torch.log(predD))
       lossG_l1_iter = l1_loss(maskG, target)
       lossG_iou_iter = iou_loss(maskG, target)
@@ -269,7 +275,6 @@ def train_model(gen_model,
       optimG.zero_grad()
       lossG_iter.backward()
       optimG.step()
-
 
       # calculate metrics during train phase
       pixel_acc_iter = pixel_accuracy(maskG, target)
@@ -288,14 +293,14 @@ def train_model(gen_model,
         }
 
         log_message_iter = (f"Epoch [{epoch}/{num_epochs}], "
-                       f"Step [{idx}/{len(train_loader)}], "
-                       f"L1 Loss G: {log_info_iter['train/lossG_l1/iter']:.4f}, "
-                       f"IoU Loss G: {log_info_iter['train/lossG_iou/iter']:.4f}, "
-                       f"Adv Loss G: {log_info_iter['train/lossG_adv/iter']:.4f}, "
-                       f"Total Loss G: {log_info_iter['train/lossG/iter']:.4f}, "
-                       f"Avd Loss D: {log_info_iter['train/lossD/iter']:.4f}, "
-                       f"Pixel Accuracy: {log_info_iter['train/pixel_acc/iter']:.4f}, "
-                       f"IoU: {log_info_iter['train/iou/iter']:.4f} ")
+                            f"Step [{idx}/{len(train_loader)}], "
+                            f"L1 Loss G: {log_info_iter['train/lossG_l1/iter']:.4f}, "
+                            f"IoU Loss G: {log_info_iter['train/lossG_iou/iter']:.4f}, "
+                            f"Adv Loss G: {log_info_iter['train/lossG_adv/iter']:.4f}, "
+                            f"Total Loss G: {log_info_iter['train/lossG/iter']:.4f}, "
+                            f"Avd Loss D: {log_info_iter['train/lossD/iter']:.4f}, "
+                            f"Pixel Accuracy: {log_info_iter['train/pixel_acc/iter']:.4f}, "
+                            f"IoU: {log_info_iter['train/iou/iter']:.4f} ")
 
         print(log_message_iter)
         logging.info(log_message_iter)
@@ -304,14 +309,14 @@ def train_model(gen_model,
           wandb.log(log_info_iter)
 
         # draw Generator and Discriminator loss plot per iteration
-        draw_plot(first_variable = lossG_iter_list, second_variable = lossD_iter_list,
-                  title = 'G and D iteration loss plot', xlabel = 'iteration',
-                  ylabel = 'loss', first_label='generator', second_label = 'discriminator',
-                  save_name = 'train_iter_loss.jpg', checkpoint_dir = checkpoint_dir)
+        draw_plot(first_variable=lossG_iter_list, second_variable=lossD_iter_list,
+                  title='G and D iteration loss plot', xlabel='iteration',
+                  ylabel='loss', first_label='generator', second_label='discriminator',
+                  save_name='train_iter_loss.jpg', checkpoint_dir=checkpoint_dir)
 
       # saving images of generated masks
       if idx % 200 == 0:
-        save_generated_image(maskG, epoch, idx, checkpoint_dir = checkpoint_dir, image_type = 'generated_correction')
+        save_generated_image(maskG, epoch, idx, checkpoint_dir=checkpoint_dir, image_type='generated_correction')
 
       lossG_l1_epoch += lossG_l1_iter.item()
       lossG_iou_epoch += lossG_iou_iter.item()
@@ -356,13 +361,13 @@ def train_model(gen_model,
     }
 
     log_message_epoch = (f"Losses per epoch [{epoch}/{num_epochs}], "
-                        f"L1 Loss G: {log_info_epoch['train/lossG_l1/epoch']:.4f}, "
-                        f"IoU Loss G: {log_info_epoch['train/lossG_iou/epoch']:.4f}, "
-                        f"Adv Loss G: {log_info_epoch['train/lossG_adv/epoch']:.4f}, "
-                        f"Total Loss G: {log_info_epoch['train/lossG/epoch']:.4f} "
-                        f"Adv Loss D: {log_info_epoch['train/lossD/epoch']:.4f}, "
-                        f"Pixel Accuracy: {log_info_epoch['train/pixel_acc/epoch']:.4f}"
-                        f"IoU: {log_info_epoch['train/iou/epoch']:.4f}")
+                         f"L1 Loss G: {log_info_epoch['train/lossG_l1/epoch']:.4f}, "
+                         f"IoU Loss G: {log_info_epoch['train/lossG_iou/epoch']:.4f}, "
+                         f"Adv Loss G: {log_info_epoch['train/lossG_adv/epoch']:.4f}, "
+                         f"Total Loss G: {log_info_epoch['train/lossG/epoch']:.4f} "
+                         f"Adv Loss D: {log_info_epoch['train/lossD/epoch']:.4f}, "
+                         f"Pixel Accuracy: {log_info_epoch['train/pixel_acc/epoch']:.4f}"
+                         f"IoU: {log_info_epoch['train/iou/epoch']:.4f}")
 
     print(log_message_epoch)
     logging.info(log_message_epoch)
@@ -376,41 +381,40 @@ def train_model(gen_model,
     pixel_acc_epoch_list_train.append(log_info_epoch['train/pixel_acc/epoch'])
     iou_epoch_list_train.append(log_info_epoch['train/iou/epoch'])
 
-
     # get average loss, pixel accuracy and iou per epoch during validation phase
-    lossG_epoch_val, pixel_acc_epoch_val, iou_epoch_val = validate_model(gen_model = gen_model,
-                                                                         val_loader = val_loader,
-                                                                         current_epoch = epoch,
-                                                                         num_epochs = num_epochs,
-                                                                         checkpoint_dir = checkpoint_dir,
-                                                                         device = device)
+    lossG_epoch_val, pixel_acc_epoch_val, iou_epoch_val = validate_model(gen_model=gen_model,
+                                                                         val_loader=val_loader,
+                                                                         current_epoch=epoch,
+                                                                         num_epochs=num_epochs,
+                                                                         checkpoint_dir=checkpoint_dir,
+                                                                         device=device)
     lossG_epoch_list_val.append(lossG_epoch_val)
     iou_epoch_list_val.append(iou_epoch_val)
     pixel_acc_epoch_list_val.append(pixel_acc_epoch_val)
 
-    # draw epoch Generator and Discriminator losses for training phase
-    draw_plot(first_variable = lossG_epoch_list_train, second_variable = lossD_epoch_list_train,
+    # draw epoch Generator and Discriminator loss for training phase
+    draw_plot(first_variable=lossG_epoch_list_train, second_variable=lossD_epoch_list_train,
               title='Epoch Loss Plot for train phase', xlabel='epoch',
               ylabel='loss', first_label='generator', second_label='discriminator',
-              save_name='train_epoch_loss.jpg', checkpoint_dir = checkpoint_dir)
+              save_name='train_epoch_loss.jpg', checkpoint_dir=checkpoint_dir)
 
     # draw epoch Generator loss for validation phase
-    draw_plot(first_variable = lossG_epoch_list_val, label = 'generator',
-              title = 'Epoch Loss plot for valid phase', xlabel = 'Iteration',
-              ylabel = 'Loss', save_name = 'generator_val_epoch_loss.jpg',
-              checkpoint_dir = checkpoint_dir)
+    draw_plot(first_variable=lossG_epoch_list_val, label='generator',
+              title='Epoch Loss plot for valid phase', xlabel='Iteration',
+              ylabel='Loss', save_name='generator_val_epoch_loss.jpg',
+              checkpoint_dir=checkpoint_dir)
 
     # draw epoch IoU for training and validation phases
-    draw_plot(first_variable = iou_epoch_list_train, second_variable = iou_epoch_list_val,
-              title = 'Epoch IoU plot', xlabel = 'epoch',
-              ylabel = 'iou', first_label = 'train_iou', second_label = 'valid_iou',
-              save_name = 'epoch_iou.jpg', checkpoint_dir = checkpoint_dir)
+    draw_plot(first_variable=iou_epoch_list_train, second_variable=iou_epoch_list_val,
+              title='Epoch IoU plot', xlabel='epoch',
+              ylabel='iou', first_label='train_iou', second_label='valid_iou',
+              save_name='epoch_iou.jpg', checkpoint_dir=checkpoint_dir)
 
     # draw epoch Pixel Accuracy for training and validation phases
-    draw_plot(first_variable = pixel_acc_epoch_list_train, second_variable = pixel_acc_epoch_list_val,
-              title = 'Epoch Pixel Accuracy plot', xlabel = 'epoch',
-              ylabel = 'pixel accuracy', first_label = 'train_pixel_acc', second_label = 'valid_pixel_acc',
-              save_name = 'epoch_pixel_acc.jpg', checkpoint_dir = checkpoint_dir)
+    draw_plot(first_variable=pixel_acc_epoch_list_train, second_variable=pixel_acc_epoch_list_val,
+              title='Epoch Pixel Accuracy plot', xlabel='epoch',
+              ylabel='pixel accuracy', first_label='train_pixel_acc', second_label='valid_pixel_acc',
+              save_name='epoch_pixel_acc.jpg', checkpoint_dir=checkpoint_dir)
 
     schedG.step()
     schedD.step()
@@ -418,19 +422,20 @@ def train_model(gen_model,
   print('Traning complete')
   logging.info('Traning complete')
 
+
 if LOG_WANDB:
   wandb.login()
   wandb.init(
-    project = "MB-OPC",
-    name = "DAMO generator + discriminator",
-    config = {
+    project="MB-OPC",
+    name="DAMO generator + discriminator",
+    config={
       "architecture": "DAMO Gen + Disc",
       "optimizer": "Adam",
-      "optimizer_parameters" : 'learning_rate - 2e-4, weight_decay - 1e-5',
-      "scheduler" : "CosineAnnealing",
-      "scheduler_parameters" : "T_max - 30, eta_min - 1e-7",
+      "optimizer_parameters": 'learning_rate - 2e-4, weight_decay - 1e-5',
+      "scheduler": "CosineAnnealing",
+      "scheduler_parameters": "T_max - 30, eta_min - 1e-7",
       "learning_rate": LEARNING_RATE,
-      "epochs" : EPOCHS,
+      "epochs": EPOCHS,
       "dataset": "1024x1024 grayscale images",
       "description": "full DAMO model, training from scratch"
     }
@@ -438,13 +443,13 @@ if LOG_WANDB:
   )
 
 CHECKPOINT_DIR = next_exp_folder(CHECKPOINT_PATH)
-DEVICE = torch.device('cpu')#torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cpu')  # torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 setup_logging(CHECKPOINT_DIR)
 logging.info(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
 logging.info(f'Training device:{DEVICE}')
 
-generator_model = Generator(in_ch = 1, out_ch = 1)
+generator_model = Generator(in_ch=1, out_ch=1)
 generator_model = generator_model.to(DEVICE)
 print(f'Generator model initialized: {generator_model}')
 logging.info('Generator model initialized')
@@ -458,7 +463,7 @@ if LOG_WANDB:
   wandb.watch(generator_model, log='all')
   wandb.watch(discriminator_model, log='all')
 
-test_image = torch.randn((1,1,1024,1024)).to(DEVICE)
+test_image = torch.randn((1, 1, 1024, 1024)).to(DEVICE)
 generator_output = generator_model.forward(test_image)
 print(f'Generator output shape: {generator_output.shape}')
 print(f'Generator output shape: {torch.sigmoid(generator_output).shape}')
@@ -468,21 +473,27 @@ print(f'Discriminator output shape: {discriminator_output.shape}')
 
 logging.info(f'Batch size:{BATCH_SIZE}')
 # Define dataset
-TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'), os.path.join(DATASET_PATH,'correction/train_correction'), transform = apply_transform(binarize_flag = True))
-VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'), os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform(binarize_flag = True))
-TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'), os.path.join(DATASET_PATH, 'correction/test_correction'), transform = apply_transform(binarize_flag = True))
+TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'),
+                           os.path.join(DATASET_PATH, 'correction/train_correction'),
+                           transform=apply_transform(binarize_flag=True))
+VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'),
+                           os.path.join(DATASET_PATH, 'correction/valid_correction'),
+                           transform=apply_transform(binarize_flag=True))
+TEST_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/test_origin'),
+                          os.path.join(DATASET_PATH, 'correction/test_correction'),
+                          transform=apply_transform(binarize_flag=True))
 
 # Define dataloader
-TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = BATCH_SIZE, shuffle = True, num_workers = 8)
-VALID_LOADER = DataLoader(VALID_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 8)
-TEST_LOADER = DataLoader(TEST_DATASET, batch_size = BATCH_SIZE, shuffle = False, num_workers = 8)
+TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
+VALID_LOADER = DataLoader(VALID_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8)
+TEST_LOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8)
 
 print(f'Number of images in train subset:{len(TRAIN_DATASET)}')
 print(f'Number of images in valid subset:{len(VALID_DATASET)}')
 print(f'Number of images in test subset:{len(TEST_DATASET)}\n')
 
-# Define losses
-iou_loss = IouLoss(weight = 1.0)
+# Define loss
+iou_loss = IouLoss(weight=1.0)
 l1_loss = torch.nn.L1Loss()
 
 # Define metrics
@@ -494,17 +505,17 @@ if DEBUG_LOSS:
   image, target = image.to(DEVICE), target.to(DEVICE)
   print(f'Image shape: {image.shape}')
   print(f'Target shape: {target.shape}')
-  print(f'Image shape after removing batch dimension: {image[0,0].shape}')
+  print(f'Image shape after removing batch dimension: {image[0, 0].shape}')
 
   params = generator_model(image)
   maskFake = torch.sigmoid(params)
   print(f'Generator output shape: {maskFake}')
-  zeros = torch.zeros([maskFake.shape[0]], dtype = maskFake.dtype, device = maskFake.device)
+  zeros = torch.zeros([maskFake.shape[0]], dtype=maskFake.dtype, device=maskFake.device)
   maskTrue = target
-  ones = torch.ones([maskTrue.shape[0]], dtype = maskTrue.dtype, device = maskTrue.device)
-  x = torch.cat([maskFake, maskTrue], dim = 0)
+  ones = torch.ones([maskTrue.shape[0]], dtype=maskTrue.dtype, device=maskTrue.device)
+  x = torch.cat([maskFake, maskTrue], dim=0)
   print(f'X shape: {x.shape}')
-  y = torch.cat([zeros, ones], dim = 0)
+  y = torch.cat([zeros, ones], dim=0)
   print(f'Y shape: {y.shape}')
   predD1 = discriminator_model(x)
   lossD = torch.nn.functional.binary_cross_entropy(predD1.view(-1), y)
@@ -519,17 +530,17 @@ if DEBUG_LOSS:
   print(f'L1-loss shape: {l1_loss_value.shape}')
 
 start_train = time.time()
-#Train the model
-train_model(gen_model = generator_model,
-	          disc_model = discriminator_model,
-            train_loader = TRAIN_LOADER,
-            val_loader = VALID_LOADER,
-            num_epochs = EPOCHS,
-            lr = LEARNING_RATE,
-            device = DEVICE,
-            start_epoch = 0,
-            checkpoint_dir = CHECKPOINT_DIR,
-            resume = False)
+# Train the model
+train_model(gen_model=generator_model,
+            disc_model=discriminator_model,
+            train_loader=TRAIN_LOADER,
+            val_loader=VALID_LOADER,
+            num_epochs=EPOCHS,
+            lr=LEARNING_RATE,
+            device=DEVICE,
+            start_epoch=0,
+            checkpoint_dir=CHECKPOINT_DIR,
+            resume=False)
 end_train = time.time()
 total_time = end_train - start_train
 hours, rem = divmod(total_time, 3600)
@@ -539,16 +550,16 @@ logging.info(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02
 
 print(f'Evaluating model on validation set..:')
 logging.info(f'Evaluating model on validation set..:')
-evaluate_model(model = generator_model,
-               loader = VALID_LOADER,
-               device = DEVICE,
-               log = True)
+evaluate_model(model=generator_model,
+               loader=VALID_LOADER,
+               device=DEVICE,
+               log=True)
 print(f'Evaluating model on test set..:')
 logging.info(f'Evaluating model on test set..:')
-evaluate_model(model = generator_model,
-               loader = TEST_LOADER,
-               device = DEVICE,
-               log = True)
+evaluate_model(model=generator_model,
+               loader=TEST_LOADER,
+               device=DEVICE,
+               log=True)
 
 if LOG_WANDB:
   wandb.finish()

@@ -1,0 +1,10 @@
+# configs.yaml
+defaults:
+  - env: local # default env (override via CLI: '+env=train_machine')
+  - model: unet # chose model
+  - optim: adam # chose optimizer
+  - sched: cos_anneal # choose scheduler)
+  - loss: composite # choose loss (single or composite)
+  - _self_ # self-referencial (allows overrides)
+
+batch_size: 6

@@ -12,12 +12,14 @@ import logging
 import time
 import sys
 import os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from src.models.cfno import CFNONet
 from src.utils import ContourLoss, IouLoss, next_exp_folder, IoU, PixelAccuracy, draw_plot, MobileNetPerceptualLoss
 from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
 from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE, LOG_WANDB, RESUME, DEBUG_LOSS
+
 
 def set_random_seed(seed):
   torch.manual_seed(seed)
@@ -27,10 +29,12 @@ def set_random_seed(seed):
   np.random.seed(seed)
   random.seed(seed)
 
+
 set_random_seed(42)
 
+
 def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", image_type='true_correction'):
-  single_image = output[0].squeeze(dim = 0)
+  single_image = output[0].squeeze(dim=0)
   single_image[single_image > 0.5] = 1.0
   single_image[single_image <= 0.5] = 0.0
 
@@ -39,12 +43,13 @@ def save_generated_image(output, epoch, step, checkpoint_dir="checkpoints", imag
   print(f"Saved generated image at {img_save_path}")
   logging.info(f"Saved generated image at {img_save_path}")
 
+
 def setup_logging(exp_folder):
   # Set up logging configuration
   log_file_path = os.path.join(exp_folder, 'training_log.txt')
-  logging.basicConfig(filename = log_file_path,
-                      level = logging.INFO,
-                      datefmt = '%d/%m/%Y %H:%M')
+  logging.basicConfig(filename=log_file_path,
+                      level=logging.INFO,
+                      datefmt='%d/%m/%Y %H:%M')
 
 
 def validate_model(model,
@@ -232,7 +237,7 @@ def train_model(model,
       params = model(image)
       mask = torch.sigmoid(params)
 
-      # calculate losses during train phase
+      # calculate loss during train phase
       lossG_bce_iter = bce_loss(mask, target)
       lossG_iou_iter = iou_loss(mask, target)
       lossG_iter = lossG_bce_iter + lossG_iou_iter
@@ -287,7 +292,6 @@ def train_model(model,
       pixel_acc_epoch += pixel_acc_iter.item()
       iou_epoch += iou_iter.item()
 
-
       if idx % 500 == 0:
         checkpoint_path = os.path.join(checkpoint_dir, 'last_checkpoint.pth')
         torch.save({
@@ -336,7 +340,7 @@ def train_model(model,
     iou_epoch_list_val.append(iou_epoch_val)
     pixel_acc_epoch_list_val.append(pixel_acc_epoch_val)
 
-    # draw epoch losses for training and validation phases
+    # draw epoch loss for training and validation phases
     draw_plot(first_variable=lossG_epoch_list_train, second_variable=lossG_epoch_list_val,
               title='Loss plot', xlabel='epoch',
               ylabel='loss', first_label='train_loss', second_label='valid_loss',

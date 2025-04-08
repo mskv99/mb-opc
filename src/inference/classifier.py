@@ -22,6 +22,7 @@ from src.utils import next_exp_folder, draw_plot
 from src.dataset import BinarizeTransform
 from src.config import CLASSIFACTION_DATA_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
+
 def set_random_seed(seed):
   torch.manual_seed(seed)
   torch.cuda.manual_seed(seed)
@@ -30,7 +31,8 @@ def set_random_seed(seed):
   np.random.seed(seed)
   random.seed(seed)
 
-#set_random_seed(42)
+
+# set_random_seed(42)
 
 data_transforms = {
   'train': transforms.Compose([
@@ -57,7 +59,7 @@ class BinaryClassificationCNN(nn.Module):
     self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1)  # Output: 32 x 256 x 256
     self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)  # Output: 64 x 128 x 128
     self.conv4 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)  # Output: 128 x 64 x 64
-    self.conv5 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1) # Output: 256 x 32 x 32
+    self.conv5 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1)  # Output: 256 x 32 x 32
 
     # Fully connected layers
     self.fc1 = nn.Linear(256 * 4 * 4, 512)  # Flattened input to 512 nodes
@@ -73,7 +75,7 @@ class BinaryClassificationCNN(nn.Module):
     self.dropout = nn.Dropout(0.5)
     self.sigmoid = nn.Sigmoid()
     self.avgpool = nn.AvgPool2d(kernel_size=2, stride=2)
-    self.global_avgpool = nn.AdaptiveAvgPool2d((4,4))
+    self.global_avgpool = nn.AdaptiveAvgPool2d((4, 4))
 
   def forward(self, x):
     x = self.avgpool(x)
@@ -95,17 +97,21 @@ class BinaryClassificationCNN(nn.Module):
     x = self.fc2(x)
 
     # Apply sigmoid for binary classification
-    #x = self.sigmoid(x)
+    # x = self.sigmoid(x)
     return x
+
 
 class SaveActivations:
   def __init__(self, module):
     self.hook = module.register_forward_hook(self.hook_fn)
     self.features = None
+
   def hook_fn(self, module, input, output):
     self.features = output
+
   def remove(self):
     self.hook.remove()
+
 
 def calculate_accuracy(outputs, labels):
   predictions = (outputs > 0.5).float()  # Convert probabilities to binary predictions (0 or 1)
@@ -114,8 +120,7 @@ def calculate_accuracy(outputs, labels):
   return accuracy
 
 
-def evaluate(model, loader, loader_type = 'test'):
-
+def evaluate(model, loader, loader_type='test'):
   accuracy = 0
   model.eval()
   with torch.no_grad():
@@ -154,16 +159,16 @@ def predict(model, loader, loader_type='test', num_samples=10):
 
   rows = 2
   cols = 5
-  fig = plt.figure(figsize = (4 * cols - 1, 4 * rows - 1))
+  fig = plt.figure(figsize=(4 * cols - 1, 4 * rows - 1))
   for i in range(cols):
     for j in range(rows):
       random_index = np.random.randint(0, len(true_labels))
       ax = fig.add_subplot(rows, cols, i * rows + j + 1)
       ax.grid('off')
       ax.axis('off')
-      ax.imshow(np.transpose(images_list[random_index], (1,2,0)), cmap = 'gray')
-      ax.set_title(f'real_class: {class_names[int(true_labels[random_index]) ]} \n' 
-                   f'predicted class: {class_names[int(pred_labels[random_index]) ]} \n'
+      ax.imshow(np.transpose(images_list[random_index], (1, 2, 0)), cmap='gray')
+      ax.set_title(f'real_class: {class_names[int(true_labels[random_index])]} \n'
+                   f'predicted class: {class_names[int(pred_labels[random_index])]} \n'
                    f'probability: {probs[random_index]}')
   plt.show()
 
@@ -171,23 +176,24 @@ def predict(model, loader, loader_type='test', num_samples=10):
   # print(f'Probabilities: {probs}')
   # print(f'Predicted labels: {pred_labels}')
 
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 MODEL_PATH = 'checkpoints/exp_22/last_checkpoint.pth'
 VAL_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'val'), data_transforms['val'])
 TEST_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'test'), data_transforms['val'])
 
-VAL_LOADER = torch.utils.data.DataLoader(VAL_DATASET, batch_size = 1, shuffle = False)
-TEST_LOADER = torch.utils.data.DataLoader(TEST_DATASET, batch_size = 1 , shuffle = True)
+VAL_LOADER = torch.utils.data.DataLoader(VAL_DATASET, batch_size=1, shuffle=False)
+TEST_LOADER = torch.utils.data.DataLoader(TEST_DATASET, batch_size=1, shuffle=True)
 
 class_names = VAL_DATASET.classes
 print(f'Dataset classes:{class_names}')
 
 classifier_model = BinaryClassificationCNN()
-classifier_model.load_state_dict(torch.load(MODEL_PATH, map_location = device)['model_state_dict'])
+classifier_model.load_state_dict(torch.load(MODEL_PATH, map_location=device)['model_state_dict'])
 classifier_model = classifier_model.to(device)
 classifier_model.eval()
 print(classifier_model)
-print(summary(classifier_model, (1,1,1024, 1024)))
+print(summary(classifier_model, (1, 1, 1024, 1024)))
 
 # conv2_hook = SaveActivations(classifier_model.conv2)
 # conv3_hook = SaveActivations(classifier_model.conv3)
@@ -229,7 +235,7 @@ print(summary(classifier_model, (1,1,1024, 1024)))
 # num_channels = conv5_features.shape[1]
 #
 # # Choose how many channels you want to display (or set to num_channels to show all)
-# # For large models, it might be impractical to show all feature maps at once.
+# # For large model, it might be impractical to show all feature maps at once.
 # num_to_display = min(num_channels, 16 + 1)  # For example, display the first 16 channels
 #
 # # Calculate the grid size (e.g., 4x4 for 16 channels)
@@ -264,4 +270,4 @@ print(summary(classifier_model, (1,1,1024, 1024)))
 
 # evaluate(model = classifier_model, loader = VAL_LOADER, loader_type = 'val')
 # evaluate(model = classifier_model, loader = TEST_LOADER, loader_type = 'test')
-predict(model = classifier_model, loader = TEST_LOADER, loader_type = 'test')
+predict(model=classifier_model, loader=TEST_LOADER, loader_type='test')

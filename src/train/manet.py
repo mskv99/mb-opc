@@ -16,7 +16,6 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-
 from src.utils import ContourLoss, IouLoss, next_exp_folder, IoU, PixelAccuracy, draw_plot
 from src.dataset import OPCDataset, BinarizeTransform, calculate_mean_std, apply_transform
 from src.config import DATASET_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE, LOG_WANDB, RESUME, DEBUG_LOSS
@@ -238,7 +237,7 @@ def train_model(model,
       params = model(image)
       mask = torch.sigmoid(params)
 
-      # calculate losses during train phase
+      # calculate loss during train phase
       lossG_bce_iter = bce_loss(mask, target)
       lossG_iou_iter = iou_loss(mask, target)
       lossG_iter = lossG_bce_iter + lossG_iou_iter
@@ -337,7 +336,7 @@ def train_model(model,
     iou_epoch_list_val.append(iou_epoch_val)
     pixel_acc_epoch_list_val.append(pixel_acc_epoch_val)
 
-    # draw epoch losses for training and validation phases
+    # draw epoch loss for training and validation phases
     draw_plot(first_variable=lossG_epoch_list_train, second_variable=lossG_epoch_list_val,
               title='Loss plot', xlabel='epoch',
               ylabel='loss', first_label='train_loss', second_label='valid_loss',
