@@ -32,9 +32,9 @@ def set_random_seed(seed):
 set_random_seed(42)
 
 parser = argparse.ArgumentParser(description='Performing inference on topology images')
-parser.add_argument('inference_folder', type=str, help='Relative path to an inference image folder',
+parser.add_argument('--inference_folder', type=str, help='Relative path to an inference image folder',
                     default='data/processed/gds_dataset/origin/test_origin')
-parser.add_argument('model_type', type=str, choices=['unet', 'cfno', 'manet', 'pspnet.yaml'], default='unet',
+parser.add_argument('--model_type', type=str, choices=['unet', 'cfno', 'manet', 'pspnet'], default='unet',
                     help='architecture for inference')
 parser.add_argument('weights', type=str, help='relative path to model weights')
 parser.add_argument('--batch_size', type=int, default=2, help='Batch size for inference')
