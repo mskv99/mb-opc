@@ -1,3 +1,0 @@
-loss:
-  - _target_: src.utils.IouLoss
-  - _target_: torch.nn.BCELoss

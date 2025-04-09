@@ -1,0 +1,6 @@
+components:
+  - _target_: torch.nn.BCELoss
+  - _target_: src.utils.IouLoss
+weights:
+  bce: 1
+  iou: 1
