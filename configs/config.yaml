@@ -9,3 +9,6 @@ defaults:
 
 batch_size: 6
 epochs: 30
+hydra:
+  run:
+    dir: .

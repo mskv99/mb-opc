@@ -1,5 +1,4 @@
-optimizer:
-  _target_: torch.optim.Adam
-  _partial_: true
-  lr: 2e-4
-  weight_decay: 1e-5
+_target_: torch.optim.Adam
+_partial_: True
+lr: 2e-4
+weight_decay: 1e-5
