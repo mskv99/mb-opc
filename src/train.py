@@ -2,54 +2,88 @@ import os
 import sys
 import torch
 import hydra
-from hydra.utils import instantiate
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger, CSVLogger
+from torch.utils.data import DataLoader
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from models.lit_generator import LitGenerator
+from src.dataset import OPCDataset, apply_transform
 
 
-@hydra.main(config_path='../configs', config_name='config')
+@hydra.main(config_path="../configs", config_name="config", version_base="1.1")
 def train(cfg: DictConfig):
-  # We simply print the configuration
-  # print(OmegaConf.to_yaml(cfg))
-  model = instantiate(cfg.model)
+    # We simply print the configuration
+    # print(OmegaConf.to_yaml(cfg))
+    DATASET_PATH = cfg["env"]["paths"]["dataset"]
+    BATCH_SIZE = cfg["batch_size"]
+    EPOCHS = cfg["epochs"]
+    LOG_DIR = cfg["env"]["paths"]["checkpoint"]
+    DEVICE = cfg["device"]
 
-  print(cfg['env'])
-  print(cfg['loss'])
-  print(cfg['model'])
-  print(cfg['optim'])
-  print(cfg['sched'])
+    TRAIN_DATASET = OPCDataset(
+        os.path.join(DATASET_PATH, "origin/train_origin/"),
+        os.path.join(DATASET_PATH, "correction/train_correction/"),
+        transform=apply_transform(binarize_flag=True),
+    )
+    VALID_DATASET = OPCDataset(
+        os.path.join(DATASET_PATH, "origin/valid_origin/"),
+        os.path.join(DATASET_PATH, "correction/valid_correction/"),
+        transform=apply_transform(binarize_flag=True),
+    )
+    TEST_DATASET = OPCDataset(
+        os.path.join(DATASET_PATH, "origin/test_origin/"),
+        os.path.join(DATASET_PATH, "correction/test_correction/"),
+        transform=apply_transform(binarize_flag=True),
+    )
 
-  scheduler = instantiate(cfg['sched'])
-  optimizer = instantiate(cfg['optim'])
-  dataset_path = cfg['env']['paths']['dataset']
-  checkpoint_dir = cfg['env']['paths']['checkpoint']
-  batch_size = cfg['batch_size']
-  epochs = cfg['epochs']
+    # Define dataloader
+    TRAIN_LOADER = DataLoader(
+        TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=8
+    )
+    VALID_LOADER = DataLoader(
+        VALID_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
+    )
+    TEST_LOADER = DataLoader(
+        TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
+    )
+    lit_gen = LitGenerator(config=cfg)
 
-  losses = [instantiate(v) for k, v in cfg['loss'].items() if k != 'weights']
-  loss_names = cfg['loss']['weights'].keys()
-  losses_dict = dict(zip(loss_names, tuple(zip(losses[0], cfg['loss']['weights'].values()))))
-  weights_dict = cfg['loss']['weights']
+    early_stopping = EarlyStopping(
+        monitor="val/iou/epoch", mode="max", patience=10, min_delta=0.01, verbose=True
+    )
 
-  print(f'Scheduler: {scheduler}')
-  print(f'Optimizer: {optimizer}')
-  print(f'Dataset path: {dataset_path}')
-  print(f'Checkpoint dir: {checkpoint_dir}')
-  print(f'Batch size: {batch_size}')
-  print(f'Model: {model}')
-  print(f'Epochs: {epochs}')
+    checkpoint_callback = ModelCheckpoint(
+        monitor="val/iou/epoch",
+        mode="max",
+        save_top_k=1,
+        dirpath=cfg["env"]["paths"]["checkpoints_dir"],
+        filename="best_checkpoint",
+    )
 
-  print(f'losses: {losses}')
-  print(f'loss_names: {loss_names}')
-  print(f'losses_dict: {losses_dict}')
-  print(f'weights: {weights_dict}')
+    csv_logger = CSVLogger(save_dir=LOG_DIR, name="csv_logs")
+    wandb_logger = WandbLogger(project="MB-OPC", log_model=False, log="epoch")
+    wandb_logger.experiment.config.update(cfg)
 
-  # iou_loss = losses['loss']
-  prediction = torch.randn((1, 1, 30, 30), dtype=torch.float32).sigmoid()
-  target = torch.ones((1, 1, 30, 30), dtype=torch.float32)
-  # print(f'iou_loss: {iou_loss(prediction, target)}')
+    trainer = pl.Trainer(
+        max_epochs=EPOCHS,
+        log_every_n_steps=10,
+        accelerator=DEVICE,
+        callbacks=[early_stopping, checkpoint_callback],
+        logger=[wandb_logger, csv_logger],
+        default_root_dir=LOG_DIR,
+    )
+
+    trainer.fit(lit_gen, TRAIN_LOADER, VALID_LOADER)
+
+    val_result = trainer.validate(lit_gen, dataloaders=VALID_LOADER)
+    test_result = trainer.test(lit_gen, dataloaders=TEST_LOADER)
+
+    print("Validation result:", val_result)
+    print("Test result:", test_result)
 
 
-if __name__ == '__main__':
-  sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-  print(sys.path)
-  train()
+if __name__ == "__main__":
+    train()

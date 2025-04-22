@@ -1,5 +1,8 @@
+import os
+import wandb
 import torch
 import pytorch_lightning as pl
+from torchvision.utils import save_image
 from hydra.utils import instantiate
 
 from src.metrics import IoU, PixelAccuracy
@@ -14,6 +17,7 @@ class LitGenerator(pl.LightningModule):
         self.criterion = instantiate(config["loss"])
         self.iou = IoU()
         self.pixel_acc = PixelAccuracy()
+        self.val_example_logged = False
 
     def forward(self, x):
         return self.model(x)
@@ -43,12 +47,26 @@ class LitGenerator(pl.LightningModule):
 
         return loss
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, batch_idx):
         origin, target = batch
         pred = torch.sigmoid(self(origin))
         loss, loss_dict = self.compute_loss(pred, target)
         iou = self.iou(pred, target)
         pixel_acc = self.pixel_acc(pred, target)
+        # Сохраняем первый пример на валидации
+        if not self.val_example_logged and batch_idx == 0:
+            out_dir = self.config["env"]["paths"]["checkpoint"]
+            os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
+            save_image(
+                pred,
+                os.path.join(out_dir, f"images/pred_epoch{self.current_epoch}.png"),
+            )
+
+            if isinstance(self.logger, pl.loggers.WandbLogger):
+                self.logger.experiment.log(
+                    {f"val/sample_epoch{self.current_epoch}": wandb.Image(pred[0])}
+                )
+            self.val_example_logged = True
 
         for k, v in loss_dict.items():
             self.log(
@@ -58,6 +76,9 @@ class LitGenerator(pl.LightningModule):
         self.log(f"val/iou/epoch", iou, on_step=False, on_epoch=True)
 
         return loss
+
+    def on_validation_start(self):
+        self.val_example_logged = False
 
     def on_train_epoch_end(self):
         pass

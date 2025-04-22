@@ -8,6 +8,7 @@ defaults:
   - _self_ # self-referencial (allows overrides)
 
 batch_size: 6
+device: "gpu"
 epochs: 30
 hydra:
   run:
