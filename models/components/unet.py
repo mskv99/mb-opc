@@ -57,7 +57,7 @@ class deconv_block(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, in_ch=1, out_ch=1, skip_con_type="concat"):
+    def __init__(self, in_ch=1, out_ch=1, skip_con_type=None):
         super().__init__()
 
         n1 = 32
@@ -97,19 +97,21 @@ class Generator(nn.Module):
         self.res7 = conv_block(filters[4], filters[4], stride=1)
         self.res8 = conv_block(filters[4], filters[4], stride=1)
 
-        if self.skip_con_type == "concat":
+        if not self.skip_con_type or self.skip_con_type == "add":
+            self.deconv0 = deconv_block(filters[0], n1, stride=2)
+            self.deconv1 = deconv_block(filters[1], filters[0], stride=2)
+            self.deconv2 = deconv_block(filters[2], filters[1], stride=2)
+            self.deconv3 = deconv_block(filters[3], filters[2], stride=2)
+            self.deconv4 = deconv_block(filters[4], filters[3], stride=2)
+        elif self.skip_con_type == "concat":
             self.deconv0 = deconv_block(filters[0] * 2, n1, stride=2)
             self.deconv1 = deconv_block(filters[1] * 2, filters[0], stride=2)
             self.deconv2 = deconv_block(filters[2] * 2, filters[1], stride=2)
             self.deconv3 = deconv_block(filters[3] * 2, filters[2], stride=2)
             self.deconv4 = deconv_block(filters[4], filters[3], stride=2)
 
-        elif self.skip_con_type == "add":
-            self.deconv0 = deconv_block(filters[0], n1, stride=2)
-            self.deconv1 = deconv_block(filters[1], filters[0], stride=2)
-            self.deconv2 = deconv_block(filters[2], filters[1], stride=2)
-            self.deconv3 = deconv_block(filters[3], filters[2], stride=2)
-            self.deconv4 = deconv_block(filters[4], filters[3], stride=2)
+        else:
+            raise ValueError(f"Unsupported skip-connections type: {skip_con_type}")
 
         self.conv_tail = nn.Conv2d(n1, out_ch, kernel_size=7, stride=1, padding=3)
 
@@ -139,8 +141,6 @@ class Generator(nn.Module):
             x1_1 = self.deconv1(torch.cat([x2_1, x1_0], dim=1))
             x0_1 = self.deconv0(torch.cat([x1_1, x0_0], dim=1))
 
-            output = self.conv_tail(x0_1)
-
         elif self.skip_con_type == "add":
             x4_1 = self.deconv4(xres)
             x3_1 = self.deconv3(x4_1) + x2_0
@@ -148,7 +148,14 @@ class Generator(nn.Module):
             x1_1 = self.deconv1(x2_1) + x0_0
             x0_1 = self.deconv0(x1_1) + x_head
 
-            output = self.conv_tail(x0_1)
+        elif not self.skip_con_type:
+            x4_1 = self.deconv4(xres)
+            x3_1 = self.deconv3(x4_1)
+            x2_1 = self.deconv2(x3_1)
+            x1_1 = self.deconv1(x2_1)
+            x0_1 = self.deconv0(x1_1)
+
+        output = self.conv_tail(x0_1)
 
         return output
 
