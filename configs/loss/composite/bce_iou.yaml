@@ -6,4 +6,4 @@
 #  iou: 1
 _target_: src.losses.IouBceLoss
 iou_weight: 1
-bce_weight: 0.5
+bce_weight: 1
