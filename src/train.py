@@ -1,6 +1,5 @@
 import os
 import sys
-import torch
 import hydra
 from omegaconf import DictConfig
 import pytorch_lightning as pl
@@ -9,8 +8,10 @@ from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from torch.utils.data import DataLoader
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from models.lit_generator import LitGenerator
 from src.dataset import OPCDataset, apply_transform
+from src.utils import next_exp_folder
 
 
 @hydra.main(config_path="../configs", config_name="config", version_base="1.1")
@@ -20,7 +21,7 @@ def train(cfg: DictConfig):
     DATASET_PATH = cfg["env"]["paths"]["dataset"]
     BATCH_SIZE = cfg["batch_size"]
     EPOCHS = cfg["epochs"]
-    LOG_DIR = cfg["env"]["paths"]["checkpoint"]
+    LOG_DIR = next_exp_folder(cfg["env"]["paths"]["checkpoint"])
     DEVICE = cfg["device"]
 
     TRAIN_DATASET = OPCDataset(
@@ -49,7 +50,7 @@ def train(cfg: DictConfig):
     TEST_LOADER = DataLoader(
         TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
     )
-    lit_gen = LitGenerator(config=cfg)
+    lit_gen = LitGenerator(config=cfg, log_dir=LOG_DIR)
 
     early_stopping = EarlyStopping(
         monitor="val/iou/epoch", mode="max", patience=10, min_delta=0.01, verbose=True
@@ -65,7 +66,6 @@ def train(cfg: DictConfig):
 
     csv_logger = CSVLogger(save_dir=LOG_DIR, name="csv_logs")
     wandb_logger = WandbLogger(project="MB-OPC", log_model=False, log="epoch")
-    wandb_logger.experiment.config.update(cfg)
 
     trainer = pl.Trainer(
         max_epochs=EPOCHS,
@@ -78,10 +78,11 @@ def train(cfg: DictConfig):
 
     trainer.fit(lit_gen, TRAIN_LOADER, VALID_LOADER)
 
-    val_result = trainer.validate(lit_gen, dataloaders=VALID_LOADER)
-    test_result = trainer.test(lit_gen, dataloaders=TEST_LOADER)
-
+    print("Calculating validation metrics:")
+    val_result = trainer.test(lit_gen, dataloaders=VALID_LOADER)
     print("Validation result:", val_result)
+    print("Calculating test metrics:")
+    test_result = trainer.test(lit_gen, dataloaders=TEST_LOADER)
     print("Test result:", test_result)
 
 
