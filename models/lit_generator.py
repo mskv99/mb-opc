@@ -62,14 +62,14 @@ class LitGenerator(pl.LightningModule):
             save_image(
                 pred,
                 os.path.join(
-                    self.log_dir, f"images/pred_epoch{self.current_epoch}.png"
+                    self.log_dir, f"pred_epoch{self.current_epoch}.png"
                 ),
             )
 
             if isinstance(self.logger, pl.loggers.WandbLogger):
                 columns = ["target_correction", "predicted_correction"]
                 data = [[wandb.Image(target[0]), wandb.Image(pred[0])]]
-                self.logger.experiment.log_table(
+                self.logger.log_table(
                     key="sample_table", columns=columns, data=data
                 )
 

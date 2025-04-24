@@ -60,12 +60,12 @@ def train(cfg: DictConfig):
         monitor="val/iou/epoch",
         mode="max",
         save_top_k=1,
-        dirpath=cfg["env"]["paths"]["checkpoints_dir"],
+        dirpath=LOG_DIR,
         filename="best_checkpoint",
     )
 
     csv_logger = CSVLogger(save_dir=LOG_DIR, name="csv_logs")
-    wandb_logger = WandbLogger(project="MB-OPC", log_model=False, log="epoch")
+    wandb_logger = WandbLogger(project="MB-OPC", log_model=False)
 
     trainer = pl.Trainer(
         max_epochs=EPOCHS,
