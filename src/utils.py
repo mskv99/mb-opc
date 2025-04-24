@@ -83,7 +83,7 @@ def load_model(model_type: str, weights_path: str, device):
         model = CFNONet()
         ckpt = torch.load(weights_path, map_location=device)
         model.load_state_dict(ckpt["model_state_dict"])
-    elif model_type in ["manet", "pspnet", "deeplabv3", "unetplusplus"]:
+    elif model_type in ["manet", "pspnet", "deeplabv3", "unetplusplus", "upernet"]:
         model = smp.from_pretrained(weights_path)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")

@@ -1,6 +1,4 @@
 import os
-from typing import Any
-
 import wandb
 import torch
 import pytorch_lightning as pl
@@ -22,6 +20,7 @@ class LitGenerator(pl.LightningModule):
         self.pixel_acc = PixelAccuracy()
         self.val_example_logged = False
         self.log_dir = log_dir
+        self.test_step_outputs = []
 
     def forward(self, x):
         return self.model(x)
@@ -61,17 +60,13 @@ class LitGenerator(pl.LightningModule):
         if not self.val_example_logged and batch_idx == 0:
             save_image(
                 pred,
-                os.path.join(
-                    self.log_dir, f"pred_epoch{self.current_epoch}.png"
-                ),
+                os.path.join(self.log_dir, f"pred_epoch{self.current_epoch}.png"),
             )
 
             if isinstance(self.logger, pl.loggers.WandbLogger):
                 columns = ["target_correction", "predicted_correction"]
                 data = [[wandb.Image(target[0]), wandb.Image(pred[0])]]
-                self.logger.log_table(
-                    key="sample_table", columns=columns, data=data
-                )
+                self.logger.log_table(key="sample_table", columns=columns, data=data)
 
             self.val_example_logged = True
 
@@ -90,6 +85,7 @@ class LitGenerator(pl.LightningModule):
         loss, loss_dict = self.compute_loss(pred, target)
         iou = self.iou(pred, target)
         pixel_acc = self.pixel_acc(pred, target)
+        self.test_step_outputs.append({"iou": iou, "pixel_acc": pixel_acc})
         return {
             "iou": iou,
             "pixel_acc": pixel_acc,
@@ -105,8 +101,8 @@ class LitGenerator(pl.LightningModule):
         pass
 
     def on_test_epoch_end(self, outputs) -> None:
-        ious = torch.stack([o["iou"] for o in outputs])
-        pixel_accs = torch.stack([o["pixel_acc"] for o in outputs])
+        ious = torch.stack([o["iou"] for o in self.test_step_outputs])
+        pixel_accs = torch.stack([o["pixel_acc"] for o in self.test_step_outputs])
         avg_iou = ious.mean().item()
         avg_pixel_acc = pixel_accs.mean().item()
 
