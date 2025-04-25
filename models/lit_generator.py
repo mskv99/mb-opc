@@ -2,7 +2,6 @@ import os
 import wandb
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torchvision.utils import save_image
 from hydra.utils import instantiate
 
@@ -56,7 +55,7 @@ class LitGenerator(pl.LightningModule):
         loss, loss_dict = self.compute_loss(pred, target)
         iou = self.iou(pred, target)
         pixel_acc = self.pixel_acc(pred, target)
-        # Сохраняем первый пример на валидации
+        # Save first prediction on valid data
         if not self.val_example_logged and batch_idx == 0:
             save_image(
                 pred,
@@ -64,9 +63,7 @@ class LitGenerator(pl.LightningModule):
             )
 
             if isinstance(self.logger, pl.loggers.WandbLogger):
-                columns = ["target_correction", "predicted_correction"]
-                data = [[wandb.Image(target[0]), wandb.Image(pred[0])]]
-                self.logger.log_table(key="sample_table", columns=columns, data=data)
+                self.logger.experiment.log({f"val/sample_epoch{self.current_epoch}": wandb.Image(pred[0])})
 
             self.val_example_logged = True
 
@@ -100,7 +97,7 @@ class LitGenerator(pl.LightningModule):
     def on_validation_epoch_end(self):
         pass
 
-    def on_test_epoch_end(self, outputs) -> None:
+    def on_test_epoch_end(self) -> None:
         ious = torch.stack([o["iou"] for o in self.test_step_outputs])
         pixel_accs = torch.stack([o["pixel_acc"] for o in self.test_step_outputs])
         avg_iou = ious.mean().item()
