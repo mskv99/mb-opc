@@ -11,7 +11,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from models.lit_generator import LitGenerator
 from src.dataset import OPCDataset, apply_transform
-from src.utils import next_exp_folder
 
 
 @hydra.main(config_path="../configs", config_name="config", version_base="1.1")
@@ -21,7 +20,7 @@ def train(cfg: DictConfig):
     DATASET_PATH = cfg["env"]["paths"]["dataset"]
     BATCH_SIZE = cfg["batch_size"]
     EPOCHS = cfg["epochs"]
-    LOG_DIR = next_exp_folder(cfg["env"]["paths"]["checkpoint"])
+    LOG_DIR = cfg["env"]["paths"]["checkpoint"]
     DEVICE = cfg["device"]
 
     TRAIN_DATASET = OPCDataset(
@@ -50,30 +49,28 @@ def train(cfg: DictConfig):
     TEST_LOADER = DataLoader(
         TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
     )
-    lit_gen = LitGenerator(config=cfg, log_dir=LOG_DIR)
+    lit_gen = LitGenerator(config=cfg)
 
     early_stopping = EarlyStopping(
-        monitor="val/iou/epoch", mode="max", patience=10, min_delta=0.01, verbose=True
+        monitor="val/iou/epoch", mode="max", patience=10, min_delta=0.001, verbose=True
     )
 
+    csv_logger = CSVLogger(save_dir=LOG_DIR, name=None)
+    wandb_logger = WandbLogger(project="MB-OPC", log_model=False)
     checkpoint_callback = ModelCheckpoint(
         monitor="val/iou/epoch",
         mode="max",
         save_top_k=1,
-        dirpath=LOG_DIR,
         filename="best_checkpoint",
+        dirpath=csv_logger.log_dir,
     )
-
-    csv_logger = CSVLogger(save_dir=LOG_DIR, name="csv_logs")
-    wandb_logger = WandbLogger(project="MB-OPC", log_model=False)
 
     trainer = pl.Trainer(
         max_epochs=EPOCHS,
         log_every_n_steps=10,
         accelerator=DEVICE,
         callbacks=[early_stopping, checkpoint_callback],
-        logger=[wandb_logger, csv_logger],
-        default_root_dir=LOG_DIR,
+        logger=[csv_logger, wandb_logger],
     )
 
     trainer.fit(lit_gen, TRAIN_LOADER, VALID_LOADER)
