@@ -1,11 +1,11 @@
 import cv2
 import wandb
 import torch
-import random
-import numpy as np
 import torch.optim as optim
+
 from tqdm import tqdm
 import torch.optim.lr_scheduler as lr_sched
+import segmentation_models_pytorch as smp
 from torch.utils.data import DataLoader
 import logging
 import time
@@ -14,11 +14,11 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from models.components.cfno import CFNONet
 from src.losses import IouLoss
 from src.metrics import IoU, PixelAccuracy
 from src.utils import draw_plot, next_exp_folder, set_random_seed
 from src.dataset import OPCDataset, apply_transform
+
 
 set_random_seed(42)
 
@@ -316,17 +316,10 @@ def train_model(
             iou_epoch += iou_iter.item()
 
             if idx % 500 == 0:
-                checkpoint_path = os.path.join(checkpoint_dir, "last_checkpoint.pth")
-                torch.save(
-                    {
-                        "epoch": epoch,
-                        "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                    },
-                    checkpoint_path,
-                )
-                print(f"Saved checkpoint at {checkpoint_path}")
-                logging.info(f"Saved checkpoint at {checkpoint_path}")
+                checkpoint_path = os.path.join(checkpoint_dir, "last_checkpoint")
+                model.save_pretrained(checkpoint_path)
+                print(f"Saved model at {checkpoint_path}")
+                logging.info(f"Saved model at {checkpoint_path}")
 
         log_info_epoch = {
             "epoch": epoch,
@@ -415,6 +408,7 @@ def train_model(
     logging.info("Traning complete")
 
 
+# define parameters of experiment
 BATCH_SIZE = 6
 EPOCHS = 30
 LEARNING_RATE = 2e-4
@@ -428,9 +422,9 @@ if LOG_WANDB:
     wandb.login()
     wandb.init(
         project="MB-OPC",
-        name="CFNO generator, BCE-loss",
+        name="MANet, BCE-loss",
         config={
-            "architecture": "CFNO generator",
+            "architecture": "MANet",
             "optimizer": "Adam",
             "optimizer_parameters": "learning_rate - 2e-4, weight_decay - 1e-5",
             "scheduler": "CosineAnnealing",
@@ -438,7 +432,7 @@ if LOG_WANDB:
             "learning_rate": LEARNING_RATE,
             "epochs": EPOCHS,
             "dataset": "1024x1024 grayscale images",
-            "description": "CFNO generator, BCE-loss, train from scratch",
+            "description": "MANet, BCE-loss, train from scratch",
         },
     )
 
@@ -449,7 +443,7 @@ setup_logging(CHECKPOINT_DIR)
 logging.info(f"Experiment logs will be saved in: {CHECKPOINT_DIR}")
 logging.info(f"Training device:{DEVICE}")
 
-generator_model = CFNONet()
+generator_model = smp.MAnet(in_channels=1, classes=1)
 generator_model = generator_model.to(DEVICE)
 print("Model initialized:", generator_model)
 logging.info("Model initialized")

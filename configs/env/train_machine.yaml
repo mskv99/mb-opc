@@ -1,0 +1,3 @@
+paths:
+  dataset: "/home/amoskovtsev/projects/mb_opc/data/processed/gds_dataset"
+  checkpoint: "/mnt/data/amoskovtsev/mb_opc/checkpoints"

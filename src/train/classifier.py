@@ -21,6 +21,7 @@ from src.utils import next_exp_folder, draw_plot
 from src.dataset import BinarizeTransform
 from src.config import CLASSIFACTION_DATA_PATH, CHECKPOINT_PATH, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
+
 def set_random_seed(seed):
   torch.manual_seed(seed)
   torch.cuda.manual_seed(seed)
@@ -29,14 +30,17 @@ def set_random_seed(seed):
   np.random.seed(seed)
   random.seed(seed)
 
+
 set_random_seed(42)
+
 
 def setup_logging(exp_folder):
   # Set up logging configuration
   log_file_path = os.path.join(exp_folder, 'training_log.txt')
-  logging.basicConfig(filename = log_file_path,
-                      level = logging.INFO,
-                      datefmt = '%d/%m/%Y %H:%M')
+  logging.basicConfig(filename=log_file_path,
+                      level=logging.INFO,
+                      datefmt='%d/%m/%Y %H:%M')
+
 
 data_transforms = {
   'train': transforms.Compose([
@@ -53,6 +57,7 @@ data_transforms = {
   ])
 }
 
+
 class BinaryClassificationCNN(nn.Module):
   def __init__(self):
     super(BinaryClassificationCNN, self).__init__()
@@ -62,7 +67,7 @@ class BinaryClassificationCNN(nn.Module):
     self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1)  # Output: 32 x 256 x 256
     self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)  # Output: 64 x 128 x 128
     self.conv4 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)  # Output: 128 x 64 x 64
-    self.conv5 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1) # Output: 256 x 32 x 32
+    self.conv5 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1)  # Output: 256 x 32 x 32
 
     # Fully connected layers
     self.fc1 = nn.Linear(256 * 4 * 4, 512)  # Flattened input to 512 nodes
@@ -78,7 +83,7 @@ class BinaryClassificationCNN(nn.Module):
     self.dropout = nn.Dropout(0.5)
     self.sigmoid = nn.Sigmoid()
     self.avgpool = nn.AvgPool2d(kernel_size=2, stride=2)
-    self.global_avgpool = nn.AdaptiveAvgPool2d((4,4))
+    self.global_avgpool = nn.AdaptiveAvgPool2d((4, 4))
 
   def forward(self, x):
     x = self.avgpool(x)
@@ -103,14 +108,15 @@ class BinaryClassificationCNN(nn.Module):
     x = self.sigmoid(x)
     return x
 
+
 def calculate_accuracy(outputs, labels):
   predictions = (outputs > 0.5).float()  # Convert probabilities to binary predictions (0 or 1)
   correct = (predictions == labels).sum().item()
   accuracy = correct / labels.size(0)
   return accuracy
 
-def evaluate(model, loader, loader_type = 'test'):
 
+def evaluate(model, loader, loader_type='test'):
   accuracy = 0
   model.eval()
   with torch.no_grad():
@@ -189,7 +195,7 @@ def train_model(model, train_loader, val_loader, num_epochs, learning_rate, chec
     print(log_line)
     logging.info(log_line)
 
-    # Append losses and accuracies for plotting
+    # Append loss and accuracies for plotting
     train_losses.append(train_loss)
     val_losses.append(val_loss)
     train_accuracies.append(train_accuracy)
@@ -203,7 +209,7 @@ def train_model(model, train_loader, val_loader, num_epochs, learning_rate, chec
     print(f"Saved checkpoint at {checkpoint_path}")
     logging.info(f"Saved checkpoint at {checkpoint_path}")
 
-  # draw epoch losses for training and validation phases
+  # draw epoch loss for training and validation phases
   draw_plot(first_variable=train_losses, second_variable=val_losses,
             title='Loss plot', xlabel='epoch',
             ylabel='loss', first_label='train_loss', second_label='valid_loss',
@@ -215,8 +221,8 @@ def train_model(model, train_loader, val_loader, num_epochs, learning_rate, chec
             ylabel='accuracy', first_label='train_acc', second_label='valid_acc',
             save_name='epoch_acc.jpg', checkpoint_dir=checkpoint_dir)
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
   CHECKPOINT_DIR = next_exp_folder(CHECKPOINT_PATH)
   device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   print(f'Experiment logs will be saved in: {CHECKPOINT_DIR}')
@@ -227,8 +233,8 @@ if __name__ == '__main__':
   VAL_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'val'), data_transforms['val'])
   TEST_DATASET = datasets.ImageFolder(os.path.join(CLASSIFACTION_DATA_PATH, 'test'), data_transforms['val'])
 
-  TRAIN_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size = 5, shuffle = True, num_workers = 2)
-  VAL_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size = 5, shuffle = False, num_workers = 2)
+  TRAIN_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=5, shuffle=True, num_workers=2)
+  VAL_LOADER = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=5, shuffle=False, num_workers=2)
   TEST_LOADER = torch.utils.data.DataLoader(TEST_DATASET, batch_size=1, shuffle=False, num_workers=2)
 
   class_names = TRAIN_DATASET.classes
@@ -245,15 +251,15 @@ if __name__ == '__main__':
   output_batch = model(image_batch)
   print(f'Output shape:{output_batch.shape}')
   print(output_batch)
-  print(summary(model, (1,1,512, 512)))
+  print(summary(model, (1, 1, 512, 512)))
 
   start_train = time.time()
-  train_model(model = model,
-              train_loader = TRAIN_LOADER,
-              val_loader = VAL_LOADER,
-              num_epochs = 15,
-              learning_rate = 0.001,
-              checkpoint_dir = CHECKPOINT_DIR)
+  train_model(model=model,
+              train_loader=TRAIN_LOADER,
+              val_loader=VAL_LOADER,
+              num_epochs=15,
+              learning_rate=0.001,
+              checkpoint_dir=CHECKPOINT_DIR)
   print(f'Training complete!')
   end_train = time.time()
   total_time = end_train - start_train
@@ -263,5 +269,5 @@ if __name__ == '__main__':
   logging.info(f'Training took: {int(hours):02}:{int(minutes):02}:{int(seconds):02}')
 
   # evaluating the model after training both on validation and test sets
-  evaluate(model = model, loader = VAL_LOADER, loader_type = 'valid')
-  evaluate(model = model, loader = TEST_LOADER, loader_type = 'test')
+  evaluate(model=model, loader=VAL_LOADER, loader_type='valid')
+  evaluate(model=model, loader=TEST_LOADER, loader_type='test')
