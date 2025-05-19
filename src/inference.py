@@ -10,7 +10,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.dataset import TestDataset, apply_transform
-from src.utils import next_exp_folder, set_random_seed, load_model, save_image
+from models.lit_generator import LitGenerator
+from src.utils import next_exp_folder, set_random_seed, save_image
 
 
 def infer(
@@ -36,7 +37,9 @@ def infer(
     dataset = TestDataset(inference_folder, transform=transform)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
-    model = load_model(model_type=model_type, weights_path=weights, device=device)
+    model = LitGenerator.load_from_checkpoint(checkpoint_path=weights)
+    model = model.to(device)
+    model.eval()
 
     times = []
     for batch, paths in loader:
