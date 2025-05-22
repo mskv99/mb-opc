@@ -19,7 +19,7 @@ def infer(
     inference_folder: str = "data/processed/gds_dataset/origin/test_origin",
     model_type: str = "unet",
     batch_size: int = 2,
-    output_folder: str = None,
+    output_folder: str = "inference/output_img",
 ):
     set_random_seed(42)
     if torch.cuda.is_available():
@@ -30,7 +30,7 @@ def infer(
         device = torch.device("cpu")
     print(f"Inference device: {device}")
 
-    output_dir = output_folder or next_exp_folder("inference/output_img")
+    output_dir = next_exp_folder(output_folder)
 
     transform = apply_transform(binarize_flag=True)
 

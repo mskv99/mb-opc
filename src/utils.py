@@ -4,27 +4,36 @@ import numpy as np
 import random
 import cv2
 import os
-
-from models.components.unet import Generator
-from models.components.cfno import CFNONet
-
-import segmentation_models_pytorch as smp
+import re
 
 
-def next_exp_folder(checkpoints_dir):
-    if not os.path.exists(checkpoints_dir):
-        os.makedirs(checkpoints_dir)
-    dir_list = os.listdir(checkpoints_dir)
-    give_numb = lambda x: int(x.split("_")[-1])
-    dir_numbers = [
-        give_numb(name)
-        for name in dir_list
-        if not (name.endswith(".gitkeep") or (name.endswith(("Store"))))
-    ]
-    max_number = max(dir_numbers)
-    new_exp_folder = os.path.join(checkpoints_dir, f"exp_{max_number + 1}")
-    os.makedirs(new_exp_folder)
-    return new_exp_folder
+def next_exp_folder(base_dir):
+    # Create base directory if it doesn't exist
+    os.makedirs(base_dir, exist_ok=True)
+
+    # Get list of directories in base_dir
+    entries = os.listdir(base_dir)
+
+    # Filter valid experiment folders with pattern exp_{number}
+    exp_regex = re.compile(r"^exp_(\d+)$")
+    exp_numbers = []
+
+    for name in entries:
+        full_path = os.path.join(base_dir, name)
+        if os.path.isdir(full_path):
+            match = exp_regex.match(name)
+            if match:
+                exp_numbers.append(int(match.group(1)))
+
+    # Determine next experiment number
+    next_index = max(exp_numbers, default=0) + 1
+
+    # Create new experiment folder
+    new_exp_name = f"exp_{next_index}"
+    new_exp_path = os.path.join(base_dir, new_exp_name)
+    os.makedirs(new_exp_path)
+
+    return new_exp_path
 
 
 def draw_plot(**kwargs):
@@ -99,7 +108,7 @@ def save_image(output_batch, checkpoint_dir="checkpoints", image_type="output"):
     for i, output in enumerate(output_batch):
         image = output.squeeze().cpu().numpy()
         image = (image > 0.5).astype(np.uint8) * 255
-        path = os.path.join(checkpoint_dir, f"{os.path.basename(image_type[i])}.jpg")
+        path = os.path.join(checkpoint_dir, f"{os.path.basename(image_type[i])}")
         cv2.imwrite(path, image)
         print(f"Saved to {path}")
 

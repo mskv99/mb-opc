@@ -10,7 +10,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.dataset import OPCDataset, apply_transform
 from src.metrics import IoU, PixelAccuracy
-from src.utils import load_model, set_random_seed
+from src.utils import set_random_seed
+from models.lit_generator import LitGenerator
 
 
 def evaluate_model(model, loader, device="cuda", log=False):
@@ -57,7 +58,7 @@ def evaluate_model(model, loader, device="cuda", log=False):
     )
 
 
-def main(model_type, weights, batch_size, subset):
+def main(weights, batch_size, subset):
 
     set_random_seed(42)
 
@@ -97,7 +98,10 @@ def main(model_type, weights, batch_size, subset):
         TEST_DATASET, batch_size=batch_size, shuffle=False, num_workers=2
     )
 
-    model = load_model(model_type=model_type, weights_path=weights, device=DEVICE)
+    model = LitGenerator.load_from_checkpoint(checkpoint_path=weights)
+    model = model.to(DEVICE)
+    model.eval()
+
     if subset == "train":
         print(f"Running evaluation on {subset} set:")
         evaluate_model(model=model, loader=TRAIN_LOADER, device=DEVICE, log=False)
