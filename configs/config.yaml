@@ -8,7 +8,7 @@ defaults:
 
 batch_size: 6
 device: "gpu"
-epochs: 30
+epochs: 50
 hydra:
   run:
     dir: .
