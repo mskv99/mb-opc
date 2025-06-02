@@ -58,19 +58,31 @@ def evaluate_model(model, loader, device="cuda", log=False):
     )
 
 
-def main(weights, batch_size, subset):
+def main(
+    weights,
+    data: str = "data/processed/gds_dataset/",
+    subset: str = "test",
+    batch_size: int = 2,
+    num_workers: int = 4,
+    model_type: str = "upernet",
+):
 
     set_random_seed(42)
 
     if torch.cuda.is_available():
         DEVICE = torch.device("cuda")
-    elif torch.backends.mps.is_available() and model_type not in ["cfno", "pspnet"]:
+    elif torch.backends.mps.is_available() and model_type not in [
+        "cfno",
+        "pspnet",
+        "upernet",
+    ]:
         DEVICE = torch.device("mps")
     else:
         DEVICE = torch.device("cpu")
     print(f"Inference device: {DEVICE}")
+    print(f"Running evaluation with {model_type} model...")
 
-    DATASET_PATH = "data/processed/gds_dataset/"
+    DATASET_PATH = data
 
     TRAIN_DATASET = OPCDataset(
         os.path.join(DATASET_PATH, "origin/train_origin"),
@@ -89,13 +101,13 @@ def main(weights, batch_size, subset):
     )
 
     TRAIN_LOADER = DataLoader(
-        TRAIN_DATASET, batch_size=batch_size, shuffle=True, num_workers=2
+        TRAIN_DATASET, batch_size=batch_size, shuffle=True, num_workers=num_workers
     )
     VALID_LOADER = DataLoader(
-        VALID_DATASET, batch_size=batch_size, shuffle=False, num_workers=2
+        VALID_DATASET, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
     TEST_LOADER = DataLoader(
-        TEST_DATASET, batch_size=batch_size, shuffle=False, num_workers=2
+        TEST_DATASET, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
 
     model = LitGenerator.load_from_checkpoint(checkpoint_path=weights)

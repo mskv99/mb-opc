@@ -17,14 +17,19 @@ from src.utils import next_exp_folder, set_random_seed, save_image
 def infer(
     weights: str,
     inference_folder: str = "data/processed/gds_dataset/origin/test_origin",
-    model_type: str = "unet",
+    model_type: str = "upernet",
     batch_size: int = 2,
     output_folder: str = "inference/output_img",
+    num_workers: int = 4,
 ):
     set_random_seed(42)
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    elif torch.backends.mps.is_available() and model_type not in ["cfno", "pspnet"]:
+    elif torch.backends.mps.is_available() and model_type not in [
+        "cfno",
+        "pspnet",
+        "upernet",
+    ]:
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
@@ -35,7 +40,9 @@ def infer(
     transform = apply_transform(binarize_flag=True)
 
     dataset = TestDataset(inference_folder, transform=transform)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    loader = DataLoader(
+        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
 
     model = LitGenerator.load_from_checkpoint(checkpoint_path=weights)
     model = model.to(device)
