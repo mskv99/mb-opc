@@ -1,0 +1,6 @@
+key: 7f7117ef2660f827c823ba03863048fe0eea4801
+project: MB-OPC
+name: unet-model
+
+# log every n steps in pl.Trainer
+log_every_n_steps: 10

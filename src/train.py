@@ -1,5 +1,6 @@
 import os
 import sys
+import wandb
 import hydra
 from omegaconf import DictConfig
 import pytorch_lightning as pl
@@ -18,10 +19,11 @@ def train(cfg: DictConfig):
     # We simply print the configuration
     # print(OmegaConf.to_yaml(cfg))
     DATASET_PATH = cfg["env"]["paths"]["dataset"]
-    BATCH_SIZE = cfg["batch_size"]
-    EPOCHS = cfg["epochs"]
+    BATCH_SIZE = cfg["training"]["batch_size"]
+    EPOCHS = cfg["training"]["epochs"]
     LOG_DIR = cfg["env"]["paths"]["checkpoint"]
-    DEVICE = cfg["device"]
+    DEVICE = cfg["training"]["device"]
+    NUM_WORKERS = cfg["training"]["num_workers"]
 
     TRAIN_DATASET = OPCDataset(
         os.path.join(DATASET_PATH, "origin/train_origin/"),
@@ -41,33 +43,40 @@ def train(cfg: DictConfig):
 
     # Define dataloader
     TRAIN_LOADER = DataLoader(
-        TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=8
+        TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS
     )
     VALID_LOADER = DataLoader(
-        VALID_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
+        VALID_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS
     )
     TEST_LOADER = DataLoader(
-        TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8
+        TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS
     )
     lit_gen = LitGenerator(config=cfg)
 
     early_stopping = EarlyStopping(
-        monitor="val/iou/epoch", mode="max", patience=10, min_delta=0.001, verbose=True
+        monitor="val/iou/epoch",
+        mode="max",
+        patience=cfg["training"]["patience"],
+        min_delta=cfg["training"]["min_delta"],
+        verbose=True,
     )
 
-    csv_logger = CSVLogger(save_dir=LOG_DIR, name=None)
-    wandb_logger = WandbLogger(project="MB-OPC", log_model=False)
+    csv_logger = CSVLogger(save_dir=LOG_DIR)
+    wandb.login(key=cfg["logging"]["key"])
+    wandb_logger = WandbLogger(
+        project=cfg["logging"]["project"], name=cfg["logging"]["name"], log_model=False
+    )
     checkpoint_callback = ModelCheckpoint(
         monitor="val/iou/epoch",
         mode="max",
-        save_top_k=1,
+        save_top_k=cfg["training"]["save_top_k"],
         filename="best_checkpoint",
         dirpath=csv_logger.log_dir,
     )
 
     trainer = pl.Trainer(
         max_epochs=EPOCHS,
-        log_every_n_steps=10,
+        log_every_n_steps=cfg["logging"]["log_every_n_steps"],
         accelerator=DEVICE,
         callbacks=[early_stopping, checkpoint_callback],
         logger=[csv_logger, wandb_logger],

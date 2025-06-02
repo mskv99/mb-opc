@@ -4,11 +4,10 @@ defaults:
   - optim: adam # chose optimizer
   - sched: cos_anneal # choose scheduler
   - loss: composite/bce_iou # choose loss (single or composite)
+  - logging: logging
+  - training: training
   - _self_ # self-referencial (allows overrides)
 
-batch_size: 6
-device: "gpu"
-epochs: 50
 hydra:
   run:
     dir: .

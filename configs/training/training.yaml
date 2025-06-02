@@ -1,0 +1,10 @@
+batch_size: 6
+epochs: 50
+device: "gpu"
+num_workers: 8
+
+# early stopping callback
+patience: 10
+min_delta: 0.001
+# checkpoint_callback
+save_top_k: 1
