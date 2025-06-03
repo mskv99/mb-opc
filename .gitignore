@@ -41,4 +41,4 @@ src/config.py
 .hydra/
 
 # директория с сохранёнными весами моделей на локальной машине
-checkpoints/
+checkpoints/*/

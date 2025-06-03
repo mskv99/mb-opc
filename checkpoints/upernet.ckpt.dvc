@@ -1,0 +1,6 @@
+outs:
+- md5: 1d8ba8dc610576e1f287d2faaba80685
+  size: 355459979
+  isexec: true
+  hash: md5
+  path: upernet.ckpt
