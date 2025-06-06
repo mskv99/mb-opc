@@ -1,4 +1,12 @@
-[core]
-    remote = models
-['remote "models"']
-    url = ../checkpoints
+['remote "gdrive_models"']
+    url = gdrive://1vFHDqsSWyqzw82CbQHQO7hqp3ScPMgFa
+    gdrive_acknowledge_abuse = true
+    gdrive_use_service_account = true
+    gdrive_service_account_user_email = dvc-service-account@dvc-storage-462111.iam.gserviceaccount.com
+    gdrive_service_account_json_file_path = ../configs/dvc-storage.json
+['remote "gdrive_data"']
+    url = gdrive://1kOYHf8YYUxJcLFUSZYiadhktNhKmF5Mg
+    gdrive_service_account_user_email = dvc-service-account@dvc-storage-462111.iam.gserviceaccount.com
+    gdrive_service_account_json_file_path = ../configs/dvc-storage.json
+    gdrive_use_service_account = true
+    gdrive_acknowledge_abuse = true
