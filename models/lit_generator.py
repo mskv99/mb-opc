@@ -1,9 +1,10 @@
 import os
-import wandb
-import torch
+
 import pytorch_lightning as pl
-from torchvision.utils import save_image
+import torch
+import wandb
 from hydra.utils import instantiate
+from torchvision.utils import save_image
 
 from src.metrics import IoU, PixelAccuracy
 
@@ -17,7 +18,9 @@ class LitGenerator(pl.LightningModule):
         self.criterion = instantiate(config["loss"])
         self.iou = IoU()
         self.pixel_acc = PixelAccuracy()
-        self.val_example_logged = False # flag for logging images during validation phase
+        self.val_example_logged = (
+            False  # flag for logging images during validation phase
+        )
 
     def forward(self, x):
         return self.model(x)
@@ -44,8 +47,8 @@ class LitGenerator(pl.LightningModule):
             self.log(
                 f"train/lossG_{k}/epoch", v, prog_bar=True, on_step=False, on_epoch=True
             )
-        self.log(f"train/pixel_acc/epoch", pixel_acc, on_step=False, on_epoch=True)
-        self.log(f"train/iou/epoch", iou, on_step=False, on_epoch=True)
+        self.log("train/pixel_acc/epoch", pixel_acc, on_step=False, on_epoch=True)
+        self.log("train/iou/epoch", iou, on_step=False, on_epoch=True)
 
         return loss
 
@@ -75,8 +78,8 @@ class LitGenerator(pl.LightningModule):
             self.log(
                 f"val/lossG_{k}/epoch", v, prog_bar=True, on_step=False, on_epoch=True
             )
-        self.log(f"val/pixel_acc/epoch", pixel_acc, on_step=False, on_epoch=True)
-        self.log(f"val/iou/epoch", iou, on_step=False, on_epoch=True)
+        self.log("val/pixel_acc/epoch", pixel_acc, on_step=False, on_epoch=True)
+        self.log("val/iou/epoch", iou, on_step=False, on_epoch=True)
 
         return loss
 
@@ -90,8 +93,8 @@ class LitGenerator(pl.LightningModule):
             self.log(
                 f"test/lossG_{k}/epoch", v, prog_bar=True, on_step=False, on_epoch=True
             )
-        self.log(f"test/pixel_acc/epoch", pixel_acc, on_step=False, on_epoch=True)
-        self.log(f"test/iou/epoch", iou, on_step=False, on_epoch=True)
+        self.log("test/pixel_acc/epoch", pixel_acc, on_step=False, on_epoch=True)
+        self.log("test/iou/epoch", iou, on_step=False, on_epoch=True)
 
         return loss
 

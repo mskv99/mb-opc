@@ -1,13 +1,14 @@
-from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-import torchvision.transforms as transforms
+import os
+import sys
+
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-from hydra import compose, initialize
 import numpy as np
 import torch
-import sys
-import os
+import torchvision.transforms as transforms
+from hydra import compose, initialize
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -147,7 +148,6 @@ def apply_transform(binarize_flag=False, normalize_flag=False, mean=0, std=0):
 
 
 if __name__ == "__main__":
-
     initialize(config_path="../configs")
     cfg = compose(config_name="config")
     DATASET_PATH = cfg["env"]["paths"]["dataset"]

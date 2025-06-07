@@ -182,7 +182,7 @@ class Discriminator(nn.Module):
         x1 = self.seq1(F.interpolate(x, size=(512, 512)))
 
         if self.debug:
-            print(f"Debugging Discriminator ...")
+            print("Debugging Discriminator ...")
             print(f"Input shape: {x.shape}")
             # Forward through seq0
             x0 = self.conv0_0(x)

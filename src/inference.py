@@ -1,17 +1,17 @@
+import os
 import sys
-import torch
+import time
+
+import fire
 import numpy as np
+import torch
 from torch.utils.data import DataLoader
 
-import time
-import fire
-import os
+from models.lit_generator import LitGenerator
+from src.dataset import TestDataset, apply_transform
+from src.utils import next_exp_folder, save_image, set_random_seed
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from src.dataset import TestDataset, apply_transform
-from models.lit_generator import LitGenerator
-from src.utils import next_exp_folder, set_random_seed, save_image
 
 
 def infer(

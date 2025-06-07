@@ -1,13 +1,12 @@
 import sys
 
-sys.path.append(".")
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from einops import rearrange
 from torchinfo import summary
+
+sys.path.append(".")
 
 
 def conv2d(chIn, chOut, kernel_size, stride, padding, bias=True, norm=True, relu=False):
@@ -146,7 +145,6 @@ def apply_complex(fr, fi, input):
 
 
 class ComplexLinear(nn.Module):
-
     def __init__(self, in_features, out_features):
         super(ComplexLinear, self).__init__()
         self.fc_r = nn.Linear(in_features, out_features)
@@ -175,8 +173,6 @@ class CFNO(nn.Module):
         )
 
     def forward(self, x):
-        batchsize = x.shape[0]
-        c = x.shape[1]
         h = x.shape[2] // self.k
         w = x.shape[3] // self.k
         patches = split(x, self.k)

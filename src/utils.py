@@ -1,10 +1,11 @@
-import matplotlib.pyplot as plt
-import torch
-import numpy as np
-import random
-import cv2
 import os
+import random
 import re
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
 
 def next_exp_folder(base_dir):
@@ -81,27 +82,6 @@ def set_random_seed(seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-
-
-def load_model(model_type: str, weights_path: str, device):
-    if model_type == "unet":
-        model = Generator(in_ch=1, out_ch=1, skip_con_type="concat")
-        ckpt = torch.load(weights_path, map_location=device)
-        model.load_state_dict(ckpt["model_state_dict"])
-    elif model_type == "cfno":
-        model = CFNONet()
-        ckpt = torch.load(weights_path, map_location=device)
-        model.load_state_dict(ckpt["model_state_dict"])
-    elif model_type in ["manet", "pspnet", "deeplabv3", "unetplusplus", "upernet"]:
-        model = smp.from_pretrained(weights_path)
-    else:
-        raise ValueError(f"Unsupported model type: {model_type}")
-
-    model.to(device)
-    model.eval()
-    print(f"Model '{model_type}' loaded.")
-    print(f"Total parameters: {sum(p.numel() for p in model.parameters())}")
-    return model
 
 
 def save_image(output_batch, checkpoint_dir="checkpoints", image_type="output"):

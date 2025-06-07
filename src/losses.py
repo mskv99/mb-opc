@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-
 from scipy.ndimage import distance_transform_edt
 
 

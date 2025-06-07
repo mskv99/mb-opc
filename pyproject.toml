@@ -34,4 +34,4 @@ build-backend = "poetry.core.masonry.api"
 wandb = "^0.19.11"
 black = "^25.1.0"
 pytest = "^8.3.5"
-
+pre-commit = "^4.2.0"

@@ -1,17 +1,18 @@
+import logging
+import os
+import sys
+
+import fire
 import torch
 from torch.utils.data import DataLoader
-import logging
 from tqdm import tqdm
-import fire
-import sys
-import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+from models.lit_generator import LitGenerator
 from src.dataset import OPCDataset, apply_transform
 from src.metrics import IoU, PixelAccuracy
 from src.utils import set_random_seed
-from models.lit_generator import LitGenerator
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 def evaluate_model(model, loader, device="cuda", log=False):
@@ -24,7 +25,7 @@ def evaluate_model(model, loader, device="cuda", log=False):
     iou_epoch = 0
 
     with torch.no_grad():
-        for idx, (image, target) in tqdm(enumerate(loader)):
+        for _, (image, target) in tqdm(enumerate(loader)):
             image, target = image.to(device), target.to(device)
             params = model(image)
             mask = torch.sigmoid(params)
@@ -66,7 +67,6 @@ def main(
     num_workers: int = 4,
     model_type: str = "upernet",
 ):
-
     set_random_seed(42)
 
     if torch.cuda.is_available():
