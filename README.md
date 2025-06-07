@@ -109,6 +109,11 @@ python src/evaluate.py --weights=checkpoints/upernet.ckpt --subset=test --batch_
 python src/evaluate.py --weights=checkpoints/upernet.ckpt --output_folder=inference/output_img/ --model_type=upernet
 ```
 
+## ONNX
+
+```bash
+python python models/to_onnx.py --raw_weights=/path/to/your/weights.ckpt --onnx_weights=/path/to/save/onnx/weights.onnx
+```
 
 ## Метрики
 
