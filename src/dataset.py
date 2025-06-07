@@ -1,11 +1,17 @@
-from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-import torchvision.transforms as transforms
+import os
+import sys
+
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import numpy as np
 import torch
-import os
+import torchvision.transforms as transforms
+from hydra import compose, initialize
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 class OPCDataset(Dataset):
     def __init__(self, image_dir, target_dir, transform=None):
@@ -30,6 +36,7 @@ class OPCDataset(Dataset):
 
         return image, target
 
+
 class TestDataset(Dataset):
     def __init__(self, image_dir, transform=None):
         self.image_dir = image_dir
@@ -48,6 +55,7 @@ class TestDataset(Dataset):
 
         return image, img_path
 
+
 class BinarizeTransform:
     def __init__(self, threshold=0.5):
         self.threshold = threshold
@@ -58,10 +66,15 @@ class BinarizeTransform:
         image_array = tensor.squeeze().numpy()  # Shape will be (1024, 1024)
 
         # Binarize the image
-        binarized_image = (image_array > self.threshold).astype(np.float32)  # Binary (0 or 1)
+        binarized_image = (image_array > self.threshold).astype(
+            np.float32
+        )  # Binary (0 or 1)
 
         # Convert back to tensor and maintain shape (1, 1, 1024, 1024)
-        return torch.from_numpy(binarized_image).unsqueeze(0)  # Shape will be (1, 1, 1024, 1024)
+        return torch.from_numpy(binarized_image).unsqueeze(
+            0
+        )  # Shape will be (1, 1, 1024, 1024)
+
 
 def calculate_mean_std(data_loader):
     total_pixels = 0.0
@@ -72,16 +85,16 @@ def calculate_mean_std(data_loader):
         # Assuming the shape of images: (batch_size, 1, H, W)
         total_pixels += images.numel()
         total_sum += images.sum().item()
-        total_sum_squared += (images ** 2).sum().item()
+        total_sum_squared += (images**2).sum().item()
     # Compute mean and standard deviation
     mean = total_sum / total_pixels
-    std = (total_sum_squared / total_pixels - mean ** 2) ** 0.5
+    std = (total_sum_squared / total_pixels - mean**2) ** 0.5
 
     return round(mean, 5), round(std, 5)
 
-def apply_transform(binarize_flag = False, normalize_flag = False, mean=0, std=0):
 
-    '''
+def apply_transform(binarize_flag=False, normalize_flag=False, mean=0, std=0):
+    """
     case 1: working with non-binary and non-normalized grayscale images, pixel values lie within the range [0,1]
 
     case 2: working with binary non-normalized grayscale images, pixel values lie withinh the range [0,1]
@@ -90,9 +103,9 @@ def apply_transform(binarize_flag = False, normalize_flag = False, mean=0, std=0
     case 3: working with non-binary normalized grayscale images, pixel values MAY NOT lie within the range [0,1]
     this variant is not desirable when using a sigmoid as an activation function in the last layer of the Generator
     we must ensure that the prediction values will have the same range as the preprocessed data
-    this config might be Ok, when out input data not necessarily lies within the range [0,1]
+    this configs might be Ok, when out input data not necessarily lies within the range [0,1]
 
-    After applying on a single image we we can get something like:
+    After applying on a single image we can get something like:
     Img_mean ~ 0, img_std ~ 1, img_min < 0, img_max > 1
 
     Note: it does not make sense to apply both Normalization and Binarization:
@@ -100,82 +113,101 @@ def apply_transform(binarize_flag = False, normalize_flag = False, mean=0, std=0
     from (0) and (1) for our dataset
     (b) binarize -> normalize - after applying normalization in the end we get mean and standard devation equal to
      (0) and (1 )but the data is non-binary. not desirable if we use sigmoid in the last layer
-    '''
+    """
 
-    if ((not binarize_flag) and (not normalize_flag)):
-        TRANSFORM = transforms.Compose([
-            transforms.Resize((1024, 1024)),
-            transforms.ToTensor(),
-            transforms.Grayscale()])
+    if (not binarize_flag) and (not normalize_flag):
+        TRANSFORM = transforms.Compose(
+            [
+                transforms.Resize((1024, 1024)),
+                transforms.ToTensor(),
+                transforms.Grayscale(),
+            ]
+        )
 
-    elif ((binarize_flag) and (not normalize_flag)):
-        TRANSFORM = transforms.Compose([
-            transforms.Resize((1024, 1024)),
-            transforms.ToTensor(),
-            transforms.Grayscale(),
-            BinarizeTransform(threshold=0.5)])
+    elif (binarize_flag) and (not normalize_flag):
+        TRANSFORM = transforms.Compose(
+            [
+                transforms.Resize((1024, 1024)),
+                transforms.ToTensor(),
+                transforms.Grayscale(),
+                BinarizeTransform(threshold=0.5),
+            ]
+        )
 
-    elif ((not binarize_flag) and (normalize_flag)):
-        TRANSFORM = transforms.Compose([
-            transforms.Resize((1024, 1024)),
-            transforms.ToTensor(),
-            transforms.Grayscale(),
-            transforms.Normalize(mean=[mean], std=[std])])
-
+    elif (not binarize_flag) and (normalize_flag):
+        TRANSFORM = transforms.Compose(
+            [
+                transforms.Resize((1024, 1024)),
+                transforms.ToTensor(),
+                transforms.Grayscale(),
+                transforms.Normalize(mean=[mean], std=[std]),
+            ]
+        )
 
     return TRANSFORM
 
 
-if __name__ == '__main__':
-    from config import DATASET_PATH
+if __name__ == "__main__":
+    initialize(config_path="../configs")
+    cfg = compose(config_name="config")
+    DATASET_PATH = cfg["env"]["paths"]["dataset"]
 
-    TRAIN_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/train_origin'),
-                               os.path.join(DATASET_PATH, 'correction/train_correction'), transform = apply_transform())
-    VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'),
-                               os.path.join(DATASET_PATH, 'correction/valid_correction'), transform = apply_transform())
+    TRAIN_DATASET = OPCDataset(
+        os.path.join(DATASET_PATH, "origin/train_origin"),
+        os.path.join(DATASET_PATH, "correction/train_correction"),
+        transform=apply_transform(),
+    )
+    VALID_DATASET = OPCDataset(
+        os.path.join(DATASET_PATH, "origin/valid_origin"),
+        os.path.join(DATASET_PATH, "correction/valid_correction"),
+        transform=apply_transform(),
+    )
     # Define dataloader
-    TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size = 1, shuffle = False, num_workers = 2)
-    VALID_LOADER = DataLoader(VALID_DATASET, batch_size = 1, shuffle = False, num_workers = 2)
+    TRAIN_LOADER = DataLoader(TRAIN_DATASET, batch_size=1, shuffle=False, num_workers=2)
+    VALID_LOADER = DataLoader(VALID_DATASET, batch_size=1, shuffle=False, num_workers=2)
 
-    print(f'Number of images in train subset:{len(TRAIN_DATASET)}')
-    print(f'Number of images in valid subset:{len(VALID_DATASET)}\n')
+    print(f"Number of images in train subset:{len(TRAIN_DATASET)}")
+    print(f"Number of images in valid subset:{len(VALID_DATASET)}\n")
 
-    DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        DEVICE = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        DEVICE = torch.device("mps")
+    else:
+        DEVICE = torch.device("cpu")
+    print(f"Inference device: {DEVICE}")
     SAVE_IMAGE = False
 
-    # train_mean, train_std = calculate_mean_std(TRAIN_LOADER)
     valid_mean, valid_std = calculate_mean_std(VALID_LOADER)
 
-    # print(f'Train Dataset Mean:{train_mean}, Std:{train_std}')
-    print(f'Valid Dataset Mean:{valid_mean}, Std:{valid_std}')
+    print(f"Valid Dataset Mean:{valid_mean}, Std:{valid_std}")
 
-    image, target = next(iter(TRAIN_LOADER))
+    # check image mean, std, min, max values before applying normalization
+    image, target = next(iter(VALID_LOADER))
     image, target = image.to(DEVICE), target.to(DEVICE)
-    print(f'Image shape: {image.shape}')
-    print(f'Target shape: {target.shape}')
-    print(f'Image shape after removing batch dimension: {image[0,0].shape}')
-    print(f'Image mean value: {image.mean()}, image std value: {image.std()}')
+    print(f"Image shape: {image.shape}")
+    print(f"Target shape: {target.shape}")
+    print(f"Image mean value: {image.mean()}, image std value: {image.std()}")
     print(f"Image min value: {image.min()}, Image max value: {image.max()}")
 
-    NORM_VALID_DATASET = OPCDataset(os.path.join(DATASET_PATH, 'origin/valid_origin'),
-                               os.path.join(DATASET_PATH, 'correction/valid_correction'),
-                                    transform = apply_transform(normalize_flag = True, mean = valid_mean, std = valid_std))
-    NORM_VALID_LOADER = DataLoader(NORM_VALID_DATASET, batch_size = 1, shuffle = False, num_workers = 2)
+    NORM_VALID_DATASET = OPCDataset(
+        os.path.join(DATASET_PATH, "origin/valid_origin"),
+        os.path.join(DATASET_PATH, "correction/valid_correction"),
+        transform=apply_transform(normalize_flag=True, mean=valid_mean, std=valid_std),
+    )
+    NORM_VALID_LOADER = DataLoader(
+        NORM_VALID_DATASET, batch_size=1, shuffle=False, num_workers=2
+    )
 
+    # check image mean, std, min, and max values after normalization
     norm_image, norm_target = next(iter(NORM_VALID_LOADER))
-
-    print(f'Image mean value: {norm_image.mean()}, image std value: {norm_image.std()}')
+    print(f"Image mean value: {norm_image.mean()}, image std value: {norm_image.std()}")
     print(f"Image min value: {norm_image.min()}, Image max value: {norm_image.max()}")
 
     new_valid_mean, new_valid_std = calculate_mean_std(NORM_VALID_LOADER)
 
-    print(f'New valid dataset mean:{new_valid_mean}, new Std: {new_valid_std}')
+    print(f"New valid dataset mean:{new_valid_mean}, new Std: {new_valid_std}")
 
     if SAVE_IMAGE:
-        plt.imshow(image[0, 0].cpu().numpy(), cmap='gray')
-        plt.savefig('data/external/testing_norm.jpg')
-
-
-
-
-
+        plt.imshow(image[0, 0].cpu().numpy(), cmap="gray")
+        plt.savefig("data/external/testing_norm.jpg")

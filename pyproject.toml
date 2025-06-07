@@ -1,24 +1,28 @@
 [project]
 name = "mb-opc"
 version = "0.1.0"
-description = "deep-learning based tool to perform model-based optical proximity correction in photolithography"
+description = "utilizing the power of computer vision models to perform model based optical proximity correction in lithography"
 authors = [
-    {name = "moskovtsev andrei",email = "moskovtsev.af@phystech.edu"}
+    {name = "Andrei Moskovtsev",email = "moskovtsev.af@phystech.edu"}
 ]
 readme = "README.md"
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.10"
 dependencies = [
-    "gdspy (==1.6.13)",
+    "gdspy (>=1.6.13,<2.0.0)",
     "matplotlib (==3.9.2)",
-    "numpy (==1.26.4)",
     "opencv-python (==4.10.0.84)",
     "pillow (==11.0.0)",
-    "torch (==2.0.0)",
-    "torchvision (==0.15.1)",
-    "tqdm (==4.66.5)",
+    "torch (>=2.7.0,<3.0.0)",
+    "torchvision (>=0.22.0,<0.23.0)",
+    "pytorch-lightning (>=2.5.1.post0,<3.0.0)",
+    "segmentation-models-pytorch (>=0.5.0,<0.6.0)",
+    "torchmetrics (>=1.7.1,<2.0.0)",
     "torchinfo (>=1.8.0,<2.0.0)",
-    "einops (>=0.8.1,<0.9.0)",
-    "gdsast (>=1.0.2,<2.0.0)"
+    "tqdm (>=4.67.1,<5.0.0)",
+    "hydra-core (>=1.3.2,<2.0.0)",
+    "scipy (>=1.12.0) ; python_version >= \"3.10\"",
+    "fire (>=0.7.0,<0.8.0)",
+    "dvc[gdrive] (>=3.60.0,<4.0.0)",
 ]
 
 
@@ -26,6 +30,12 @@ dependencies = [
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.group.dev.dependencies]
-wandb = "^0.19.7"
+[tool.poetry]
+package-mode = false
 
+[tool.poetry.group.dev.dependencies]
+wandb = "^0.19.11"
+black = "^25.1.0"
+pytest = "^8.3.5"
+pre-commit = "^4.2.0"
+onnxruntime = "^1.22.0"

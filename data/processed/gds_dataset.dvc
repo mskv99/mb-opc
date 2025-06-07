@@ -1,0 +1,6 @@
+outs:
+- md5: 06cba64c573b532a6aed406420a8197a.dir
+  size: 296808882
+  nfiles: 12163
+  hash: md5
+  path: gds_dataset
