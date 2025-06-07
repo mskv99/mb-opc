@@ -7,11 +7,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from models.lit_generator import LitGenerator
 from src.dataset import TestDataset, apply_transform
 from src.utils import next_exp_folder, save_image, set_random_seed
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 def infer(

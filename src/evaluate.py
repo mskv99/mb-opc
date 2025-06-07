@@ -7,12 +7,12 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from models.lit_generator import LitGenerator
 from src.dataset import OPCDataset, apply_transform
 from src.metrics import IoU, PixelAccuracy
 from src.utils import set_random_seed
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 def evaluate_model(model, loader, device="cuda", log=False):

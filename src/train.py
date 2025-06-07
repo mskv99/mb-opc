@@ -3,16 +3,16 @@ import sys
 
 import hydra
 import pytorch_lightning as pl
-import wandb
 from omegaconf import DictConfig
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 from torch.utils.data import DataLoader
 
-from models.lit_generator import LitGenerator
-from src.dataset import OPCDataset, apply_transform
+import wandb
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from models.lit_generator import LitGenerator
+from src.dataset import OPCDataset, apply_transform
 
 
 @hydra.main(config_path="../configs", config_name="config", version_base="1.1")

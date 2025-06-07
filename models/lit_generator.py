@@ -2,10 +2,10 @@ import os
 
 import pytorch_lightning as pl
 import torch
-import wandb
 from hydra.utils import instantiate
 from torchvision.utils import save_image
 
+import wandb
 from src.metrics import IoU, PixelAccuracy
 
 
