@@ -8,24 +8,29 @@ import torch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from models.lit_generator import LitGenerator
+from models.components.unet import Generator
 
 
 def check_onnx(onnx_model_path: str):
     inputs = torch.randn(1, 1, 1024, 1024)
     ort_sess = ort.InferenceSession(onnx_model_path)
-    outputs = ort_sess.run(None, {"RAW_DESIGN": inputs.numpy().astype(np.float32)})
-    print(f"Output shape:{outputs.shape}")
+    output = ort_sess.run(None, {"RAW_DESIGN": inputs.numpy().astype(np.float32)})
+    print(f"Output:{output}")
+    print(f"Output shape:{output[0].shape}")
 
 
 def main(
     raw_weights: str = "checkpoints/upernet.ckpt",
     onnx_weights: str = "checkpoints/exported_model.onnx",
-    check_onnx: bool = True,
+    check: bool = True,
 ):
-    model = LitGenerator.load_from_checkpoint(raw_weights)
-    model.eval()
+    model = Generator(in_ch=1, out_ch=1, skip_con_type="concat")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.load_state_dict(
+        torch.load(raw_weights, map_location=device)["model_state_dict"]
+    )
+    model = model.to(device)
+    model.eval()
     model.to(device)
 
     dummy_input = torch.randn(1, 1, 1024, 1024, device=device)
@@ -42,7 +47,7 @@ def main(
     )
     print("Модель успешно экспортирована в onnx формат!")
 
-    if check_onnx:
+    if check:
         check_onnx(onnx_model_path=onnx_weights)
 
 

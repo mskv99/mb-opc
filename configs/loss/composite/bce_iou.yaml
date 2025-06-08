@@ -1,9 +1,3 @@
-#components:
-#  - _target_: torch.nn.BCELoss
-#  - _target_: src.losses.IouLoss
-#weights:
-#  bce: 1
-#  iou: 1
 _target_: src.losses.IouBceLoss
 iou_weight: 1
 bce_weight: 1
