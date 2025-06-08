@@ -40,5 +40,12 @@ src/config.py
 # метаинформация по hydra
 .hydra/
 
-# директория с сохранёнными весами моделей на локальной машине
-checkpoints/*/
+# веса моделей
+checkpoints/files/
+checkpoints/manet_checkpoint/
+checkpoints/pspnet_checkpoint/
+!checkpoints/*.dvc
+
+# логи обучения
+wandb/
+logs/
